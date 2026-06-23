@@ -27,6 +27,15 @@ def _emit(enc, args, name):
     print(md)
     print(f"\n[graphmine] wrote {args.out}/{name}.json and {name}.md")
 
+    graph_path = getattr(args, "graphify_graph", None)
+    if graph_path:
+        from .adapters import graphify as gfy
+        aug_path = os.path.join(args.out, f"{name}.graphify.json")
+        stats = gfy.write_augmented(graph_path, enc, sig, aug_path)
+        print(f"[graphmine] graphify: added {stats['co_changes_with_added']} "
+              f"co_changes_with edges ({stats['unmapped_couplings']} of "
+              f"{stats['of_total']} couplings had no matching file node) -> {aug_path}")
+
 
 def main(argv=None):
     # Markdown digest uses non-ASCII (⇔, ·); force UTF-8 stdout on Windows cp1252.
@@ -61,6 +70,9 @@ def main(argv=None):
     cc.add_argument("--include-deleted", action="store_true",
                     help="keep deleted / old-rename files (archaeology); default prunes "
                          "to currently-tracked files with rename-following")
+    cc.add_argument("--graphify-graph", metavar="GRAPH_JSON",
+                    help="also emit an augmented copy of this graphify graph.json with "
+                         "additive co_changes_with edges (STATISTICAL tier, q as score)")
 
     cr = sub.add_parser("coref", parents=[common], help="graph co-reference mining")
     cr.add_argument("graph_json")
