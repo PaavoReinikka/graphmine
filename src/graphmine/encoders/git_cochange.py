@@ -18,10 +18,17 @@ _DEFAULT_SKIP_SUBSTRINGS = (
 )
 
 
-def _subsystem(path: str) -> str:
-    """Top-level path segment — the unit we measure cross-cutting coupling against."""
+def _subsystem(path: str, depth: int = 1) -> str:
+    """First ``depth`` path segments — the unit we measure cross-cutting against.
+
+    depth=1 -> top-level dir (good for flat repos); depth=2 distinguishes e.g.
+    ``src/logic-app`` from ``src/database`` in repos where everything lives under
+    one ``src/``.
+    """
     parts = path.replace("\\", "/").split("/")
-    return parts[0] if len(parts) > 1 else "(root)"
+    if len(parts) <= 1:
+        return "(root)"
+    return "/".join(parts[:depth])
 
 
 def _iter_commit_filesets(repo: str):
@@ -50,6 +57,7 @@ def encode(
     max_commit_files: int = 40,
     min_freq: int = 3,
     max_freq_frac: float = 0.4,
+    subsystem_depth: int = 1,
     skip_exts: tuple = _DEFAULT_SKIP_EXTS,
     skip_substrings: tuple = _DEFAULT_SKIP_SUBSTRINGS,
 ) -> Encoding:
@@ -81,7 +89,7 @@ def encode(
 
     fid = {f: i for i, f in enumerate(sorted(keep))}
     id_label = {i: f for f, i in fid.items()}
-    id_subsystem = {i: _subsystem(f) for f, i in fid.items()}
+    id_subsystem = {i: _subsystem(f, subsystem_depth) for f, i in fid.items()}
 
     transactions = []
     for c in commits:

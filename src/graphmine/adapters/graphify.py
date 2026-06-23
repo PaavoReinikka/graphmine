@@ -20,7 +20,8 @@ def couplings_to_graphify_edges(enc: Encoding, couplings: list[Coupling]) -> lis
         {
             "source": lab[c.a], "target": lab[c.b],
             "relation": "co_changes_with", "confidence": "STATISTICAL",
-            "confidence_score": c.p,  # Fisher p-value; smaller = stronger
+            "confidence_score": c.p_adj if c.p_adj is not None else c.p_raw,
+            "p_raw": c.p_raw,  # corrected q-value drives confidence; raw p kept for ref
         }
         for c in couplings
     ]

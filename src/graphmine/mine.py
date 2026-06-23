@@ -1,4 +1,11 @@
-"""Run Kingfisher over an Encoding and return rules in a plain, engine-agnostic form."""
+"""Run Kingfisher over an Encoding; return rules in an engine-agnostic form.
+
+Kingfisher returns RAW, uncorrected scores (it controls false discovery only by
+top-K + non-redundancy + a raw threshold — no family-wise/FDR correction). For
+the Fisher measure that score is a p-value; graphmine applies its own correction
+downstream (see postprocess). For chi2/mi/leverage the score is a test
+statistic / effect size, not a p-value, so correction does not apply.
+"""
 from __future__ import annotations
 
 import math
@@ -6,13 +13,19 @@ from dataclasses import dataclass
 
 from .encoders.base import Encoding
 
+# name -> Kingfisher measure_type. 1/2 are Fisher (the p-value measures).
+MEASURES = {"fisher": 1, "chi2": 3, "mi": 4, "leverage": 5}
+_P_VALUE_MEASURES = {1, 2}
+
 
 @dataclass
 class Rule:
-    antecedent: tuple[int, ...]   # item ids
-    consequent: int               # item id
+    antecedent: tuple[int, ...]
+    consequent: int
     is_negative: bool
-    p: float                      # Fisher p-value
+    measure_type: int
+    score: float            # comparable score (Fisher: p; others: the statistic)
+    p: float | None         # raw Fisher p-value, or None when the measure has no p
 
 
 def mine(
@@ -20,29 +33,33 @@ def mine(
     *,
     q: int = 200,
     l_max: int = 2,
-    t_type: int = 1,           # 1 = positive dependencies (the coupling case)
-    m_threshold: float = 1.0,  # max p-value to return (1.0 = all top-q)
+    t_type: int = 1,            # rule direction: 1=positive 2=negative 3=both
+    measure: str = "fisher",    # fisher | chi2 | mi | leverage
+    m_threshold: float | None = None,
 ) -> list[Rule]:
-    """Mine top-q significant rules. Thin wrapper over kingfisher_bnb so the rest
-    of graphmine never imports the engine directly."""
     import kingfisher_bnb as kf
 
     if enc.n_transactions < 2 or enc.n_items < 2:
         return []
+    mt = MEASURES[measure]
+    is_p = mt in _P_VALUE_MEASURES
+    # m_threshold is a RAW cutoff. Default to "accept all top-q": p<=1 for Fisher,
+    # a permissive statistic bound otherwise.
+    if m_threshold is None:
+        m_threshold = 1.0 if is_p else 1e18
+
     raw = kf.find_rules_from_data(
-        data=enc.transactions,
-        k=enc.n_items - 1,
-        q=q,
-        l_max=l_max,
-        t_type=t_type,
-        m_threshold=m_threshold,
+        data=enc.transactions, k=enc.n_items - 1, q=q, l_max=l_max,
+        t_type=t_type, m_threshold=m_threshold, measure_type=mt,
     )
-    return [
-        Rule(
-            antecedent=tuple(r.antecedent),
-            consequent=r.consequent,
-            is_negative=bool(r.is_negative),
-            p=math.exp(r.measure_value),
-        )
-        for r in raw
-    ]
+    out = []
+    for r in raw:
+        if is_p:
+            p = math.exp(r.measure_value)       # measure_value = ln(p)
+            score = p
+        else:
+            p = None
+            score = -r.measure_value            # stored negated so smaller=better
+        out.append(Rule(tuple(r.antecedent), r.consequent, bool(r.is_negative),
+                         mt, score, p))
+    return out

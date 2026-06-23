@@ -15,14 +15,17 @@ from .base import Encoding
 _REF_RELS = {"calls", "imports", "imports_from", "uses", "references", "inherits", "method"}
 
 
-def _subsystem(path: str | None) -> str:
+def _subsystem(path: str | None, depth: int = 1) -> str:
     if not path:
         return "?"
     parts = path.replace("\\", "/").split("/")
-    return parts[0] if len(parts) > 1 else "(root)"
+    if len(parts) <= 1:
+        return "(root)"
+    return "/".join(parts[:depth])
 
 
-def encode(graph_json: str, *, min_freq: int = 2, max_freq_frac: float = 0.6) -> Encoding:
+def encode(graph_json: str, *, min_freq: int = 2, max_freq_frac: float = 0.6,
+           subsystem_depth: int = 1) -> Encoding:
     g = json.loads(open(graph_json, encoding="utf-8").read())
     nodes = {n["id"]: n for n in g["nodes"]}
 
@@ -49,7 +52,8 @@ def encode(graph_json: str, *, min_freq: int = 2, max_freq_frac: float = 0.6) ->
 
     iid = {it: i for i, it in enumerate(sorted(keep))}
     id_label = {i: nodes[it].get("label", it) for it, i in iid.items()}
-    id_subsystem = {i: _subsystem(nodes[it].get("source_file")) for it, i in iid.items()}
+    id_subsystem = {i: _subsystem(nodes[it].get("source_file"), subsystem_depth)
+                    for it, i in iid.items()}
 
     transactions = []
     for items in txn.values():
