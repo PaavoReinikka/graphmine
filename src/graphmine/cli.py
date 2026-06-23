@@ -58,6 +58,9 @@ def main(argv=None):
     cc.add_argument("repo")
     cc.add_argument("--max-commit-files", type=int, default=40)
     cc.add_argument("--min-freq", type=int, default=3)
+    cc.add_argument("--include-deleted", action="store_true",
+                    help="keep deleted / old-rename files (archaeology); default prunes "
+                         "to currently-tracked files with rename-following")
 
     cr = sub.add_parser("coref", parents=[common], help="graph co-reference mining")
     cr.add_argument("graph_json")
@@ -71,7 +74,8 @@ def main(argv=None):
     if args.cmd == "cochange":
         from .encoders import git_cochange
         enc = git_cochange.encode(args.repo, max_commit_files=args.max_commit_files,
-                                  min_freq=args.min_freq, subsystem_depth=args.subsystem_depth)
+                                  min_freq=args.min_freq, subsystem_depth=args.subsystem_depth,
+                                  include_deleted=args.include_deleted)
         _emit(enc, args, "cochange")
     elif args.cmd == "coref":
         from .encoders import graph_coref

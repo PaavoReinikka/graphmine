@@ -7,7 +7,7 @@ requires-python = ">=3.10"
 # Kingfisher (Fisher's-exact dependency-rule mining) is the engine. It is not on
 # PyPI yet, so it is wired as a local path source below; swap to a git/PyPI
 # dependency once it is published.
-dependencies = ["kingfisher-bnb"]
+dependencies = ["kingfisher-bnb", "networkx>=3"]
 
 [project.optional-dependencies]
 # Adapter for plugging results into graphify (reads its graph.json, emits

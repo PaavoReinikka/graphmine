@@ -74,38 +74,66 @@ def significant(couplings: list[Coupling], *, alpha: float) -> list[Coupling]:
     return out
 
 
-class _UnionFind:
-    def __init__(self):
-        self.parent: dict[int, int] = {}
-
-    def find(self, x: int) -> int:
-        self.parent.setdefault(x, x)
-        while self.parent[x] != x:
-            self.parent[x] = self.parent[self.parent[x]]
-            x = self.parent[x]
-        return x
-
-    def union(self, a: int, b: int):
-        ra, rb = self.find(a), self.find(b)
-        if ra != rb:
-            self.parent[ra] = rb
+def _build_cluster(members: set[int], couplings: list[Coupling], enc: Encoding) -> Cluster:
+    qs = [(c.p_adj if c.p_adj is not None else c.p_raw)
+          for c in couplings if c.a in members and c.b in members]
+    subs = sorted({enc.subsystem(m) for m in members})
+    return Cluster(members=sorted(members), subsystems=subs,
+                   best_p_adj=min(qs) if qs else 1.0, cross_subsystem=len(subs) > 1)
 
 
 def clusters(couplings: list[Coupling], enc: Encoding) -> list[Cluster]:
-    """Connected components over the (already significance-filtered) couplings."""
-    uf = _UnionFind()
+    """Group coupled files into clusters via weighted community detection.
+
+    Naive connected components merge everything that is transitively linked into
+    one blob (e.g. many module<->test pairs bridged by shared commits). Modularity
+    community detection over the coupling graph — edges weighted by significance
+    (``-log10(q)``) — keeps tightly-coupled families together and splits weak
+    bridges, so clusters stay meaningful. Falls back to components if networkx is
+    unavailable.
+    """
+    if not couplings:
+        return []
+    import math
+    try:
+        import networkx as nx
+        from networkx.algorithms.community import greedy_modularity_communities
+    except ImportError:
+        return _components(couplings, enc)
+
+    g = nx.Graph()
     for c in couplings:
-        uf.union(c.a, c.b)
+        q = c.p_adj if c.p_adj is not None else c.p_raw
+        g.add_edge(c.a, c.b, weight=-math.log10(max(q, 1e-300)))
+
+    try:
+        comms = greedy_modularity_communities(g, weight="weight")
+    except Exception:
+        return _components(couplings, enc)
+
+    out = [_build_cluster(set(comm), couplings, enc) for comm in comms if len(comm) >= 2]
+    out.sort(key=lambda cl: (not cl.cross_subsystem, -cl.size, cl.best_p_adj))
+    return out
+
+
+def _components(couplings: list[Coupling], enc: Encoding) -> list[Cluster]:
+    """Fallback: connected components (used when networkx is absent)."""
+    parent: dict[int, int] = {}
+
+    def find(x):
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for c in couplings:
+        ra, rb = find(c.a), find(c.b)
+        if ra != rb:
+            parent[ra] = rb
     members: dict[int, set[int]] = {}
-    best: dict[int, float] = {}
     for c in couplings:
-        root = uf.find(c.a)
-        members.setdefault(root, set()).update((c.a, c.b))
-        best[root] = min(best.get(root, 1.0), c.p_adj if c.p_adj is not None else c.p_raw)
-    out = []
-    for root, mem in members.items():
-        subs = sorted({enc.subsystem(m) for m in mem})
-        out.append(Cluster(members=sorted(mem), subsystems=subs,
-                           best_p_adj=best[root], cross_subsystem=len(subs) > 1))
+        members.setdefault(find(c.a), set()).update((c.a, c.b))
+    out = [_build_cluster(mem, couplings, enc) for mem in members.values()]
     out.sort(key=lambda cl: (not cl.cross_subsystem, -cl.size, cl.best_p_adj))
     return out
