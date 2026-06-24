@@ -35,5 +35,12 @@ uv run graphmine coref graph.json          # → out/coref.{json,md}
 
 ## Status
 
-Early/experimental. Co-change is the validated path. Kingfisher is wired as a
-local path dependency (`../BranchAndBound/kingfisher`) until it is published.
+Early/experimental. Co-change is the validated path. Kingfisher is not yet on
+PyPI, so it is wired as a local path source (`../BranchAndBound/kingfisher`) — to
+build from a fresh clone you currently need that sibling checkout and a Rust
+toolchain (`uv sync` runs maturin). This will move to a normal dependency once
+Kingfisher publishes.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
