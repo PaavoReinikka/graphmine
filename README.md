@@ -30,8 +30,23 @@ encoder (corpus → transactions+labels) → mine (Kingfisher) → postprocess �
 uv sync                                    # builds the Kingfisher bindings (needs cargo)
 uv run graphmine cochange /path/to/repo    # → out/cochange.{json,md}
 uv run graphmine coref graph.json          # → out/coref.{json,md}
-# tuning: --q --l-max --t-type {1,2,3} --alpha --max-commit-files --min-freq
+# tuning: --correction {none,bonferroni,bh,by} --measure {fisher,chi2,mi,leverage}
+#         --alpha --subsystem-depth --max-commit-files --min-freq --include-deleted
 ```
+
+### Plugging into graphify
+
+Pass `--graphify-graph` to also emit a copy of a [graphify](https://github.com/PaavoReinikka/graphify)
+`graph.json` with additive, typed `co_changes_with` edges (a `STATISTICAL`
+confidence tier carrying the FDR-corrected q-value); the original graph is left
+untouched:
+
+```bash
+graphmine cochange /repo --graphify-graph graphify-out/graph.json --out graphify-out
+```
+
+graphify wraps this as `graphify cochange` when graphmine is on PATH (install via
+`uv tool install ./graphmine`).
 
 ## Status
 
