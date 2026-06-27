@@ -2,7 +2,7 @@
 
 Additive and non-destructive: the original nodes/edges are untouched; we only
 append typed ``co_changes_with`` edges between graphify's *file* nodes, carrying
-a new ``STATISTICAL`` confidence tier with the corrected q-value as the score.
+a new ``STATISTICAL`` confidence tier with the raw Fisher p-value as the score.
 Because they are a distinct relation, a consumer can filter them in or out and
 never confuses temporal coupling with a structural code dependency.
 
@@ -48,10 +48,9 @@ def augment_graph(graph: dict, enc: Encoding, couplings: list[Coupling]) -> dict
         if not sa or not sb:
             unmapped += 1
             continue
-        q = c.p_adj if c.p_adj is not None else c.p_raw
         out["edges"].append({
             "source": sa, "target": sb, "relation": "co_changes_with",
-            "confidence": "STATISTICAL", "confidence_score": q, "p_raw": c.p_raw,
+            "confidence": "STATISTICAL", "confidence_score": c.p_raw, "p_raw": c.p_raw,
             "weight": 1.0,
         })
         added += 1

@@ -3,8 +3,10 @@
 Mine **statistically significant relations** from code repositories and knowledge
 graphs — powered by [Kingfisher](https://github.com/PaavoReinikka/kingfisher-bnb)
 (top-K non-redundant dependency-rule mining via Fisher's exact test, branch-and-
-bound, no minimum support; raw p-values). graphmine adds optional multiple-testing
-correction on top.
+bound, no minimum support; raw p-values). graphmine reports these raw Fisher
+p-values directly and deliberately applies **no** multiple-testing correction — a
+pruned top-K search has no well-defined number of tests, so any FDR/FWER
+denominator would be guesswork.
 
 graphmine turns a corpus into a transactional dataset, mines significant rules,
 then **dedupes, clique-collapses, and ranks cross-subsystem relations first**, and
@@ -31,15 +33,15 @@ encoder (corpus → transactions+labels) → mine (Kingfisher) → postprocess �
 uv sync                                    # installs deps incl. the kingfisher-bnb wheel (no toolchain)
 uv run graphmine cochange /path/to/repo    # → out/cochange.{json,md}
 uv run graphmine coref graph.json          # → out/coref.{json,md}
-# tuning: --correction {none,bonferroni,bh,by} --measure {fisher,chi2,mi,leverage}
-#         --alpha --subsystem-depth --max-commit-files --min-freq --include-deleted
+# tuning: --measure {fisher,chi2,mi,leverage} --alpha --subsystem-depth
+#         --max-commit-files --min-freq --include-deleted
 ```
 
 ### Plugging into graphify
 
 Pass `--graphify-graph` to also emit a copy of a [graphify](https://github.com/PaavoReinikka/graphify)
 `graph.json` with additive, typed `co_changes_with` edges (a `STATISTICAL`
-confidence tier carrying the FDR-corrected q-value); the original graph is left
+confidence tier carrying the raw Fisher p-value); the original graph is left
 untouched:
 
 ```bash

@@ -29,13 +29,13 @@ def test_augment_is_additive_and_typed():
     g = _graph()
     n_nodes, n_edges = len(g["nodes"]), len(g["edges"])
     enc = _enc()
-    couplings = [Coupling(a=0, b=1, p_raw=1e-9, cross_subsystem=True, p_adj=1e-6)]
+    couplings = [Coupling(a=0, b=1, p_raw=1e-9, cross_subsystem=True)]
     aug = augment_graph(g, enc, couplings)
     # original untouched; one edge added
     assert len(aug["nodes"]) == n_nodes and len(aug["edges"]) == n_edges + 1
     e = aug["edges"][-1]
     assert e["relation"] == "co_changes_with" and e["confidence"] == "STATISTICAL"
-    assert e["source"] == "a_x" and e["target"] == "b_y" and e["confidence_score"] == 1e-6
+    assert e["source"] == "a_x" and e["target"] == "b_y" and e["confidence_score"] == 1e-9
     assert aug["meta"]["graphmine"]["co_changes_with_added"] == 1
 
 
@@ -43,7 +43,7 @@ def test_unmapped_coupling_is_counted_not_added():
     g = _graph()
     enc = _enc()
     # item 2 = c/z.py has no file node in the graph
-    couplings = [Coupling(a=0, b=2, p_raw=1e-9, cross_subsystem=True, p_adj=1e-6)]
+    couplings = [Coupling(a=0, b=2, p_raw=1e-9, cross_subsystem=True)]
     aug = augment_graph(g, enc, couplings)
     assert aug["meta"]["graphmine"] == {"co_changes_with_added": 0,
                                         "unmapped_couplings": 1, "of_total": 1}

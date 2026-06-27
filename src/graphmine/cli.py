@@ -1,4 +1,4 @@
-"""graphmine CLI: encode a corpus -> mine -> correct -> postprocess -> report."""
+"""graphmine CLI: encode a corpus -> mine -> postprocess -> report."""
 from __future__ import annotations
 
 import argparse
@@ -7,19 +7,17 @@ import sys
 
 from . import __version__
 from . import report as report_mod
-from .correct import METHODS
 from .mine import MEASURES, mine
-from .postprocess import apply_correction, clusters, pairwise_couplings, significant
+from .postprocess import clusters, pairwise_couplings, significant
 
 
 def _emit(enc, args, name):
     rules = mine(enc, q=args.q, l_max=args.l_max, t_type=args.t_type, measure=args.measure)
     couplings = pairwise_couplings(rules, enc)
-    apply_correction(couplings, enc, method=args.correction)
     sig = significant(couplings, alpha=args.alpha)
     cls = clusters(sig, enc)
-    data = report_mod.to_dict(enc, sig, cls, correction=args.correction, alpha=args.alpha)
-    md = report_mod.to_markdown(enc, sig, cls, correction=args.correction, alpha=args.alpha)
+    data = report_mod.to_dict(enc, sig, cls, alpha=args.alpha)
+    md = report_mod.to_markdown(enc, sig, cls, alpha=args.alpha)
     os.makedirs(args.out, exist_ok=True)
     report_mod.write_json(os.path.join(args.out, f"{name}.json"), data)
     with open(os.path.join(args.out, f"{name}.md"), "w", encoding="utf-8") as f:
@@ -54,11 +52,10 @@ def main(argv=None):
     common.add_argument("--t-type", type=int, default=1, choices=(1, 2, 3),
                         help="rule direction: 1=positive 2=negative 3=both")
     common.add_argument("--measure", default="fisher", choices=tuple(MEASURES),
-                        help="fisher (p-value; correctable) | chi2 | mi | leverage")
-    common.add_argument("--correction", default="bh", choices=METHODS,
-                        help="multiple-testing correction (Fisher only); default BH-FDR")
+                        help="fisher (p-value) | chi2 | mi | leverage")
     common.add_argument("--alpha", type=float, default=0.05,
-                        help="significance threshold on the corrected p (q-value)")
+                        help="significance threshold on the raw Fisher p-value "
+                             "(no multiple-testing correction is applied)")
     common.add_argument("--subsystem-depth", type=int, default=1,
                         help="path depth that defines a 'subsystem' for cross-cutting ranking")
     common.add_argument("--out", default="out", help="output directory")
@@ -78,9 +75,9 @@ def main(argv=None):
     cr.add_argument("graph_json")
 
     args = p.parse_args(argv)
-    if args.measure != "fisher" and args.correction != "none":
+    if args.measure != "fisher":
         print(f"[graphmine] note: --measure {args.measure} has no p-value; "
-              f"correction/alpha do not apply (ranking by raw statistic).",
+              f"alpha does not apply and no couplings are emitted (Fisher only).",
               file=sys.stderr)
 
     if args.cmd == "cochange":

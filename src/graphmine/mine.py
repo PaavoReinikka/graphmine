@@ -2,9 +2,10 @@
 
 Kingfisher returns RAW, uncorrected scores (it controls false discovery only by
 top-K + non-redundancy + a raw threshold — no family-wise/FDR correction). For
-the Fisher measure that score is a p-value; graphmine applies its own correction
-downstream (see postprocess). For chi2/mi/leverage the score is a test
-statistic / effect size, not a p-value, so correction does not apply.
+the Fisher measure that score is a p-value; graphmine reports it raw and does not
+apply multiple-testing correction (a pruned top-K search has no well-defined
+number of tests). For chi2/mi/leverage the score is a test statistic / effect
+size, not a p-value.
 """
 from __future__ import annotations
 
