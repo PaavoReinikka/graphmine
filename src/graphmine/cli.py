@@ -137,6 +137,20 @@ def main(argv=None):
     br.add_argument("--json", action="store_true", dest="as_json",
                     help="machine-readable JSON output")
 
+    mp = sub.add_parser("mcp",
+                        help="run an MCP server (blast_radius/refresh/clusters/status) for AI agents")
+    mp.add_argument("--repo", help="repo to mine and serve (in-memory + warm-start cache)")
+    mp.add_argument("--index", help="serve a prebuilt index file instead (read-only; no refresh)")
+    mp.add_argument("--encoder", default="cochange", choices=("cochange", "coref"))
+    mp.add_argument("--no-cache", action="store_true",
+                    help="pure in-memory; do not write the warm-start cache")
+    mp.add_argument("--significance", choices=("raw", "tarone"), default="raw")
+    mp.add_argument("--alpha", type=float, default=0.05)
+    mp.add_argument("--subsystem-depth", type=int, default=1)
+    mp.add_argument("--exclude", action="append", metavar="SUBSTR")
+    mp.add_argument("--min-freq", type=int, default=3)
+    mp.add_argument("--max-commit-files", type=int, default=40)
+
     args = p.parse_args(argv)
     if getattr(args, "measure", "fisher") != "fisher":
         msg = (f"[graphmine] note: --measure {args.measure} has no p-value; "
@@ -184,6 +198,21 @@ def main(argv=None):
                 tag = "  [cross]" if r["cross_subsystem"] else ""
                 hop = f"  h{r['hops']}" if args.depth > 1 else ""
                 print(f"  p={r['p_raw']:.1e}{hop}{tag}  {r['file']}")
+    elif args.cmd == "mcp":
+        if not (args.repo or args.index):
+            print("[graphmine] provide --repo or --index", file=sys.stderr)
+            return 1
+        import importlib.util
+        if importlib.util.find_spec("mcp") is None:
+            print("[graphmine] the MCP server needs the 'mcp' extra:\n"
+                  "  pip install 'graphmine[mcp]'   (or: uv pip install mcp)", file=sys.stderr)
+            return 1
+        from . import mcp_server
+        mcp_server.serve(repo=args.repo, index_path=args.index, encoder=args.encoder,
+                         use_cache=not args.no_cache, policy=args.significance,
+                         alpha=args.alpha, subsystem_depth=args.subsystem_depth,
+                         exclude=tuple(args.exclude or []), min_freq=args.min_freq,
+                         max_commit_files=args.max_commit_files)
     return 0
 
 
