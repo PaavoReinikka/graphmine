@@ -1,7 +1,8 @@
 """Unit tests for postprocessing — no Kingfisher needed (pure logic)."""
 from graphmine.encoders.base import Encoding
 from graphmine.mine import Rule
-from graphmine.postprocess import clusters, pairwise_couplings, significant
+from graphmine.postprocess import (by_file_index, clusters, pairwise_couplings,
+                                   significant)
 
 
 def _enc():
@@ -50,3 +51,18 @@ def test_clusters_collapse_components():
     cps = pairwise_couplings(rules, enc)
     cls = clusters(significant(cps, alpha=0.05), enc)
     assert sorted(c.size for c in cls) == [2, 3]
+
+
+def test_by_file_index_adjacency_and_sort():
+    enc = _enc()
+    rules = [_fisher(0, 1, 1e-6),    # a/x <-> a/y (within subsystem a)
+             _fisher(0, 3, 1e-4)]    # a/x <-> b/p (cross-subsystem)
+    sig = significant(pairwise_couplings(rules, enc), alpha=0.05)
+    cls = clusters(sig, enc)
+    bf = by_file_index(sig, cls, enc)
+    assert set(bf) == {"a/x", "a/y", "b/p"}
+    ax = bf["a/x"]
+    assert ax["subsystem"] == "a" and ax["cluster"] is not None
+    files = [w["file"] for w in ax["couples_with"]]
+    assert files == ["a/y", "b/p"]            # sorted by p (1e-6 before 1e-4)
+    assert bf["a/y"]["couples_with"][0]["file"] == "a/x"
