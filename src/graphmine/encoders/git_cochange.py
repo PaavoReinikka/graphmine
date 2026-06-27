@@ -30,10 +30,10 @@ def _subsystem(path: str, depth: int = 1) -> str:
     ``src/logic-app`` from ``src/database`` in repos where everything lives under
     one ``src/``.
     """
-    parts = path.replace("\\", "/").split("/")
-    if len(parts) <= 1:
+    dirs = path.replace("\\", "/").split("/")[:-1]   # directory only (drop filename)
+    if not dirs:
         return "(root)"
-    return "/".join(parts[:depth])
+    return "/".join(dirs[:depth])
 
 
 def _git(repo: str, *args: str) -> str:

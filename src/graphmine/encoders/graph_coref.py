@@ -18,10 +18,10 @@ _REF_RELS = {"calls", "imports", "imports_from", "uses", "references", "inherits
 def _subsystem(path: str | None, depth: int = 1) -> str:
     if not path:
         return "?"
-    parts = path.replace("\\", "/").split("/")
-    if len(parts) <= 1:
+    dirs = path.replace("\\", "/").split("/")[:-1]   # directory only (drop filename)
+    if not dirs:
         return "(root)"
-    return "/".join(parts[:depth])
+    return "/".join(dirs[:depth])
 
 
 def encode(graph_json: str, *, min_freq: int = 2, max_freq_frac: float = 0.6,
