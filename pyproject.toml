@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 # Kingfisher (Fisher's-exact dependency-rule mining) is the engine, published as
 # the `kingfisher-bnb` wheel on PyPI (Rust core, prebuilt — no toolchain needed).
-dependencies = ["kingfisher-bnb>=0.1", "networkx>=3"]
+dependencies = ["kingfisher-bnb>=0.2", "networkx>=3"]
 
 [project.optional-dependencies]
 # Adapter for plugging results into graphify (reads its graph.json, emits

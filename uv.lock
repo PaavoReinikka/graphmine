@@ -19,26 +19,26 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "kingfisher-bnb", specifier = ">=0.1" },
+    { name = "kingfisher-bnb", specifier = ">=0.2" },
     { name = "networkx", specifier = ">=3" },
 ]
 provides-extras = ["graphify"]
 
 [[package]]
 name = "kingfisher-bnb"
-version = "0.1.0"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "numpy", version = "2.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/af/b2/c3aec1dd4606ac3656920a6b60967f4fa46cfdf1ebb6835a97f7e7f5a47e/kingfisher_bnb-0.1.0.tar.gz", hash = "sha256:9076bded032e5d724a5445d30b1bf67daa7756fe91563b55cf73be8b5d99b663", size = 21989, upload-time = "2026-06-27T16:41:53.584Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/27/0f/7d33a58ebe1178af0f7eb743a6f5e8af8f73a931f7fef4e01862405dab76/kingfisher_bnb-0.2.0.tar.gz", hash = "sha256:b69bdd5908ac45011ea323c49c82ff4bce6f906dd765c97d6f1222e3085b16a9", size = 25870, upload-time = "2026-06-27T18:35:55.754Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7a/06/e1c25fa0ad270f2f14e3d8b1d34b3a6db95d670a91745964e86f302081f6/kingfisher_bnb-0.1.0-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:9053c6757b2804d22c030c3857e802583f0946551f3ab8da88d8bddd8b1c9483", size = 314207, upload-time = "2026-06-27T16:41:48.329Z" },
-    { url = "https://files.pythonhosted.org/packages/7f/a9/4d48dd07256146d803c011035b08b8094c0f7cbbdd61063b644165c4f4de/kingfisher_bnb-0.1.0-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0ecdb67b50d712b329df1368a0417ec419a4824c575b4e7e4960d30bdba2ad79", size = 356778, upload-time = "2026-06-27T16:41:49.841Z" },
-    { url = "https://files.pythonhosted.org/packages/47/62/bc184e3917e4a4d95e578d8929a493e2bff190727e2c4cb14dccb804fd77/kingfisher_bnb-0.1.0-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6041c74811d1b4fb4457675a8f3e6db9598ecfba003afbb4f097f02313ce32e0", size = 361684, upload-time = "2026-06-27T16:41:51.179Z" },
-    { url = "https://files.pythonhosted.org/packages/3b/65/087672233f1fdd02ebd39428011fde9de0813cacb61ece01d77b932e33f6/kingfisher_bnb-0.1.0-cp38-abi3-win_amd64.whl", hash = "sha256:eaccf40aa5d245e70b2290c9aa2ce3a19df6fc5e71d636392c530c0b55d4dd1d", size = 210511, upload-time = "2026-06-27T16:41:52.551Z" },
+    { url = "https://files.pythonhosted.org/packages/86/e2/79f91d7595d0eca3d31561e4bc7c8232c8519fed430d7573827b22057794/kingfisher_bnb-0.2.0-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:5d00ef655fa0a4f9df275ba889b51a2ff6985b959e73803396fc2341ab3f88b2", size = 330711, upload-time = "2026-06-27T18:35:50.653Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/92/8fa6321436444429338fd67fbebecff973df1e9fb7252d327ca46fde3852/kingfisher_bnb-0.2.0-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:618c9b14acde029b1ad6ac37394794bf06df2661bb2938d7342f5a0b58d8cc98", size = 372247, upload-time = "2026-06-27T18:35:52.032Z" },
+    { url = "https://files.pythonhosted.org/packages/7d/9b/a081b938125600f4897ade79709726154864ef0ed1744f94a90fe2e91808/kingfisher_bnb-0.2.0-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e10da45d044fcb70f662dabe5c0841b70b40e7c2b5961ea7f528e56b51cd01e9", size = 378935, upload-time = "2026-06-27T18:35:53.389Z" },
+    { url = "https://files.pythonhosted.org/packages/8f/79/8cd8d7d73ad2bbaabdcdb5808103620b8dfdcfe8c7ce808461722e39b972/kingfisher_bnb-0.2.0-cp38-abi3-win_amd64.whl", hash = "sha256:3a6f3457c2d2dc28a0a191d2098c57577c459f6449aab1964f9e43a3488fcf24", size = 226967, upload-time = "2026-06-27T18:35:54.454Z" },
 ]
 
 [[package]]
