@@ -44,6 +44,21 @@ By default graphmine writes **nothing into your project** — a built index goes
 global per-repo cache (`~/.graphmine/<repo>/`, honoring `$XDG_CACHE_HOME`). Pass
 `-o DIR` to write the index + Markdown report into the project instead.
 
+### Blast radius (which files change with this one)
+
+Mine once, then query a file's co-change neighbourhood — instant, straight from the
+cached index (no re-mining):
+
+```bash
+graphmine blast-radius --repo /path/to/repo --file src/foo.py
+graphmine blast-radius --repo /path/to/repo --changed a.py,b.py --depth 2 --json
+graphmine blast-radius out/cochange.json --file src/foo.py      # or point at an index file
+```
+
+`--changed` unions several seeds ("I'm about to touch these"); `--depth N` expands
+transitively; `--alpha` re-thresholds (tighter only); `--json` is for tools/agents.
+With `--repo`, the cached index is built on first use and reused thereafter.
+
 ### Plugging into graphify
 
 Pass `--graphify-graph` to also emit a copy of a [graphify](https://github.com/PaavoReinikka/graphify)
