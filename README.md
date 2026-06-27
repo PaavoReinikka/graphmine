@@ -90,6 +90,18 @@ graphmine cochange /repo --graphify-graph graphify-out/graph.json --out graphify
 graphify wraps this as `graphify cochange` when graphmine is on PATH (install via
 `uv tool install ./graphmine`).
 
+## Companion Skill (for AI agents)
+
+[`skills/graphmine/`](skills/graphmine/SKILL.md) is a Claude Code skill that teaches
+an agent to drive graphmine — the build → blast-radius → refresh workflow, the
+tuning heuristics (depth = component level, exclude batch-migrated dirs, when Tarone
+matters), and the MCP setup. Install it:
+
+```bash
+cp -r skills/graphmine ~/.claude/skills/                 # user-wide
+# or per-project:  cp -r skills/graphmine <project>/.claude/skills/
+```
+
 ## Status
 
 Early/experimental. Co-change is the validated path. The Kingfisher engine ships
