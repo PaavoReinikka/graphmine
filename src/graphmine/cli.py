@@ -107,6 +107,9 @@ def main(argv=None):
     cc.add_argument("repo")
     cc.add_argument("--max-commit-files", type=int, default=40)
     cc.add_argument("--min-freq", type=int, default=3)
+    cc.add_argument("--exclude", action="append", metavar="SUBSTR",
+                    help="drop files whose path contains SUBSTR (repeatable); added to the "
+                         "built-in skips, e.g. --exclude src/database")
     cc.add_argument("--include-deleted", action="store_true",
                     help="keep deleted / old-rename files (archaeology); default prunes "
                          "to currently-tracked files with rename-following")
@@ -146,7 +149,8 @@ def main(argv=None):
         from .encoders import git_cochange
         enc = git_cochange.encode(args.repo, max_commit_files=args.max_commit_files,
                                   min_freq=args.min_freq, subsystem_depth=args.subsystem_depth,
-                                  include_deleted=args.include_deleted)
+                                  include_deleted=args.include_deleted,
+                                  exclude=tuple(args.exclude or []))
         _emit(enc, args, args.repo, "cochange")
     elif args.cmd == "coref":
         from .encoders import graph_coref

@@ -100,6 +100,7 @@ def encode(
     include_deleted: bool = False,
     skip_exts: tuple = _DEFAULT_SKIP_EXTS,
     skip_substrings: tuple = _DEFAULT_SKIP_SUBSTRINGS,
+    exclude: tuple = (),
 ) -> Encoding:
     """Build a co-change Encoding from a git repo.
 
@@ -110,11 +111,14 @@ def encode(
     * by default items are restricted to currently-tracked files (rename-aware);
       ``include_deleted=True`` keeps deleted/old-name files for archaeology.
     """
+    # user --exclude substrings are added to the built-in skips (path-normalized, lowercased)
+    skips = tuple(skip_substrings) + tuple(s.replace("\\", "/").lower() for s in exclude)
+
     def keep_file(f: str) -> bool:
         fl = f.lower()
         if any(fl.endswith(e) for e in skip_exts):
             return False
-        return not any(s in fl for s in skip_substrings)
+        return not any(s in fl for s in skips)
 
     commit_filesets = list(_parse_log(repo))
     rename_map = _canonical_map(getattr(_parse_log, "renames", {}))
