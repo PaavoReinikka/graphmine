@@ -59,6 +59,23 @@ graphmine blast-radius out/cochange.json --file src/foo.py      # or point at an
 transitively; `--alpha` re-thresholds (tighter only); `--json` is for tools/agents.
 With `--repo`, the cached index is built on first use and reused thereafter.
 
+### MCP server (for AI agents)
+
+Expose the index to an AI agent over MCP. The server serves the query layer
+**in memory** (built on startup, warm-start cached), using the same Index schema
+as the CLI — so an agent and a human share one cache:
+
+```bash
+pip install 'graphmine[mcp]'
+graphmine mcp --repo /path/to/repo          # stdio server; in-memory + warm-start cache
+graphmine mcp --index out/cochange.json     # or serve a prebuilt index (read-only)
+```
+
+Tools: `blast_radius(files, alpha?, depth?, limit?)`, `refresh()` (re-mine after
+new commits), `clusters()`, `status()`. Build knobs mirror `cochange`
+(`--significance`, `--alpha`, `--subsystem-depth`, `--exclude`, …); `--no-cache`
+for pure in-memory.
+
 ### Plugging into graphify
 
 Pass `--graphify-graph` to also emit a copy of a [graphify](https://github.com/PaavoReinikka/graphify)
