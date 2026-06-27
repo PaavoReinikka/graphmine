@@ -36,8 +36,8 @@ uv run graphmine cochange /path/to/repo    # caches the index in ~/.graphmine/<r
 uv run graphmine cochange /path/to/repo -o out/   # opt in to writing index+report into the project
 uv run graphmine coref graph.json          # static co-reference mining
 # significance: --significance raw (default) | tarone   (Fisher-only; also prunes -> faster)
-# tuning: --measure {fisher,chi2,mi,leverage} --alpha --subsystem-depth
-#         --max-commit-files --min-freq --include-deleted
+# filtering: --exclude SUBSTR (repeatable, e.g. --exclude src/database) --min-freq --max-commit-files
+# tuning: --alpha --subsystem-depth --measure {fisher,chi2,mi,leverage}  (couplings are Fisher-only)
 ```
 
 By default graphmine writes **nothing into your project** — a built index goes to a
