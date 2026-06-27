@@ -64,3 +64,29 @@ def mine(
         out.append(Rule(tuple(r.antecedent), r.consequent, bool(r.is_negative),
                          mt, score, p))
     return out
+
+
+def resolve_significance(enc: Encoding, *, policy: str = "raw", alpha: float = 0.05,
+                         measure: str = "fisher") -> dict:
+    """Resolve the significance policy into an effective raw-p threshold.
+
+    * ``raw``    -> threshold = alpha.
+    * ``tarone`` -> threshold = alpha / m_eff, where m_eff is Tarone's effective
+      number of tests (Kingfisher's ``tarone()``, reusing its Fisher min-p bounds).
+      Fisher-only: a non-Fisher measure (no p-value) silently falls back to raw.
+
+    The returned ``threshold`` doubles as the mining ``m_threshold`` — a tighter
+    cutoff prunes the branch-and-bound search harder, so Tarone mining is faster.
+    The ``spectrum`` lets a consumer recompute m_eff for any alpha offline.
+    """
+    raw = {"policy": "raw", "alpha": alpha, "threshold": alpha,
+           "m_eff": None, "spectrum": None}
+    if policy != "tarone" or measure != "fisher":
+        return raw
+    if enc.n_transactions < 2 or enc.n_items < 2:
+        return raw
+    import kingfisher_bnb as kf
+
+    res = kf.tarone(enc.transactions, enc.n_items - 1, alpha)
+    return {"policy": "tarone", "alpha": alpha, "threshold": res.threshold,
+            "m_eff": res.m_eff, "spectrum": list(res.spectrum)}

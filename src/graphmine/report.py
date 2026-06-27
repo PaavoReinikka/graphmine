@@ -8,11 +8,19 @@ from .postprocess import Cluster, Coupling
 
 
 def to_dict(enc: Encoding, couplings: list[Coupling], clusters: list[Cluster],
-            *, alpha: float) -> dict:
+            *, by_file: dict, significance: dict, git_head: str | None = None) -> dict:
+    """The queryable Index: meta + by_file adjacency + clusters + couplings.
+
+    This is the single Index schema shared by the CLI and the MCP server.
+    """
     lab = enc.id_label
+    meta = {**enc.meta, "n_transactions": enc.n_transactions,
+            "n_items": enc.n_items, "significance": significance}
+    if git_head:
+        meta["git_head"] = git_head
     return {
-        "meta": {**enc.meta, "n_transactions": enc.n_transactions,
-                 "n_items": enc.n_items, "alpha": alpha},
+        "meta": meta,
+        "by_file": by_file,
         "clusters": [
             {"members": [lab[m] for m in cl.members], "subsystems": cl.subsystems,
              "best_p": cl.best_p, "size": cl.size,
@@ -33,15 +41,21 @@ def write_json(path: str, data: dict) -> None:
 
 
 def to_markdown(enc: Encoding, couplings: list[Coupling], clusters: list[Cluster],
-                *, alpha: float, top_couplings: int = 25) -> str:
+                *, significance: dict, top_couplings: int = 25) -> str:
     lab = enc.id_label
     m = enc.meta
+    sig = significance
+    if sig.get("policy") == "tarone":
+        sig_line = (f"- significance: Tarone p ≤ α/m_eff = {sig['threshold']:.2g} "
+                    f"(α={sig['alpha']:g}, m_eff={sig['m_eff']})")
+    else:
+        sig_line = f"- significance: raw Fisher p ≤ {sig['alpha']:g} (no correction)"
     lines = [
         f"# graphmine — {m.get('encoder', 'findings')}",
         "",
         f"- corpus: `{m.get('repo') or m.get('graph') or '?'}`",
         f"- transactions: {enc.n_transactions} · items: {enc.n_items}",
-        f"- significance: raw Fisher p ≤ {alpha:g} (no multiple-testing correction)",
+        sig_line,
         f"- significant couplings: {len(couplings)} · clusters: {len(clusters)}",
         "",
         "## Co-change clusters (families that move together)",

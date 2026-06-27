@@ -68,6 +68,38 @@ def significant(couplings: list[Coupling], *, alpha: float) -> list[Coupling]:
     return out
 
 
+def by_file_index(couplings: list[Coupling], clusters: list[Cluster],
+                  enc: Encoding) -> dict[str, dict]:
+    """Per-file adjacency for O(1) "everything about file X" lookups (blast radius).
+
+    ``label -> {subsystem, cluster, couples_with: [{file, p_raw, cross_subsystem}]}``
+    where ``couples_with`` is sorted by p (strongest coupling first).
+    """
+    lab = enc.id_label
+    item_cluster: dict[int, int] = {}
+    for ci, cl in enumerate(clusters):
+        for m in cl.members:
+            item_cluster[m] = ci
+
+    adj: dict[int, dict] = {}
+
+    def node(i: int) -> dict:
+        if i not in adj:
+            adj[i] = {"subsystem": enc.subsystem(i),
+                      "cluster": item_cluster.get(i), "couples_with": []}
+        return adj[i]
+
+    for c in couplings:
+        node(c.a)["couples_with"].append(
+            {"file": lab[c.b], "p_raw": c.p_raw, "cross_subsystem": c.cross_subsystem})
+        node(c.b)["couples_with"].append(
+            {"file": lab[c.a], "p_raw": c.p_raw, "cross_subsystem": c.cross_subsystem})
+
+    for e in adj.values():
+        e["couples_with"].sort(key=lambda d: d["p_raw"])
+    return {lab[i]: e for i, e in adj.items()}
+
+
 def _build_cluster(members: set[int], couplings: list[Coupling], enc: Encoding) -> Cluster:
     ps = [c.p_raw for c in couplings if c.a in members and c.b in members]
     subs = sorted({enc.subsystem(m) for m in members})
