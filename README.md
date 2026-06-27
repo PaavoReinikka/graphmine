@@ -1,9 +1,10 @@
 # graphmine
 
 Mine **statistically significant relations** from code repositories and knowledge
-graphs — powered by [Kingfisher](https://github.com/PaavoReinikka/BranchAndBound)
+graphs — powered by [Kingfisher](https://github.com/PaavoReinikka/kingfisher-bnb)
 (top-K non-redundant dependency-rule mining via Fisher's exact test, branch-and-
-bound, multiple-testing correction, no minimum support).
+bound, no minimum support; raw p-values). graphmine adds optional multiple-testing
+correction on top.
 
 graphmine turns a corpus into a transactional dataset, mines significant rules,
 then **dedupes, clique-collapses, and ranks cross-subsystem relations first**, and
@@ -27,7 +28,7 @@ encoder (corpus → transactions+labels) → mine (Kingfisher) → postprocess �
 ## Use
 
 ```bash
-uv sync                                    # builds the Kingfisher bindings (needs cargo)
+uv sync                                    # installs deps incl. the kingfisher-bnb wheel (no toolchain)
 uv run graphmine cochange /path/to/repo    # → out/cochange.{json,md}
 uv run graphmine coref graph.json          # → out/coref.{json,md}
 # tuning: --correction {none,bonferroni,bh,by} --measure {fisher,chi2,mi,leverage}
@@ -50,11 +51,9 @@ graphify wraps this as `graphify cochange` when graphmine is on PATH (install vi
 
 ## Status
 
-Early/experimental. Co-change is the validated path. Kingfisher is not yet on
-PyPI, so it is wired as a local path source (`../BranchAndBound/kingfisher`) — to
-build from a fresh clone you currently need that sibling checkout and a Rust
-toolchain (`uv sync` runs maturin). This will move to a normal dependency once
-Kingfisher publishes.
+Early/experimental. Co-change is the validated path. The Kingfisher engine ships
+as the prebuilt [`kingfisher-bnb`](https://pypi.org/project/kingfisher-bnb/) wheel
+on PyPI, so a fresh `uv sync` (or `pip install`) needs no Rust toolchain.
 
 ## License
 

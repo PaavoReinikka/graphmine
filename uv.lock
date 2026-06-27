@@ -19,7 +19,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "kingfisher-bnb", directory = "../BranchAndBound/kingfisher" },
+    { name = "kingfisher-bnb", specifier = ">=0.1" },
     { name = "networkx", specifier = ">=3" },
 ]
 provides-extras = ["graphify"]
@@ -27,18 +27,19 @@ provides-extras = ["graphify"]
 [[package]]
 name = "kingfisher-bnb"
 version = "0.1.0"
-source = { directory = "../BranchAndBound/kingfisher" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "numpy", version = "2.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
-
-[package.metadata]
-requires-dist = [{ name = "numpy" }]
-
-[package.metadata.requires-dev]
-dev = [{ name = "maturin", specifier = ">=1.12.6" }]
+sdist = { url = "https://files.pythonhosted.org/packages/af/b2/c3aec1dd4606ac3656920a6b60967f4fa46cfdf1ebb6835a97f7e7f5a47e/kingfisher_bnb-0.1.0.tar.gz", hash = "sha256:9076bded032e5d724a5445d30b1bf67daa7756fe91563b55cf73be8b5d99b663", size = 21989, upload-time = "2026-06-27T16:41:53.584Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7a/06/e1c25fa0ad270f2f14e3d8b1d34b3a6db95d670a91745964e86f302081f6/kingfisher_bnb-0.1.0-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:9053c6757b2804d22c030c3857e802583f0946551f3ab8da88d8bddd8b1c9483", size = 314207, upload-time = "2026-06-27T16:41:48.329Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/a9/4d48dd07256146d803c011035b08b8094c0f7cbbdd61063b644165c4f4de/kingfisher_bnb-0.1.0-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0ecdb67b50d712b329df1368a0417ec419a4824c575b4e7e4960d30bdba2ad79", size = 356778, upload-time = "2026-06-27T16:41:49.841Z" },
+    { url = "https://files.pythonhosted.org/packages/47/62/bc184e3917e4a4d95e578d8929a493e2bff190727e2c4cb14dccb804fd77/kingfisher_bnb-0.1.0-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6041c74811d1b4fb4457675a8f3e6db9598ecfba003afbb4f097f02313ce32e0", size = 361684, upload-time = "2026-06-27T16:41:51.179Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/65/087672233f1fdd02ebd39428011fde9de0813cacb61ece01d77b932e33f6/kingfisher_bnb-0.1.0-cp38-abi3-win_amd64.whl", hash = "sha256:eaccf40aa5d245e70b2290c9aa2ce3a19df6fc5e71d636392c530c0b55d4dd1d", size = 210511, upload-time = "2026-06-27T16:41:52.551Z" },
+]
 
 [[package]]
 name = "networkx"

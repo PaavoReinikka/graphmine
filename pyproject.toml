@@ -4,10 +4,9 @@ version = "0.1.0"
 description = "Mine statistically significant relations from code repositories and knowledge graphs (powered by Kingfisher)."
 readme = "README.md"
 requires-python = ">=3.10"
-# Kingfisher (Fisher's-exact dependency-rule mining) is the engine. It is not on
-# PyPI yet, so it is wired as a local path source below; swap to a git/PyPI
-# dependency once it is published.
-dependencies = ["kingfisher-bnb", "networkx>=3"]
+# Kingfisher (Fisher's-exact dependency-rule mining) is the engine, published as
+# the `kingfisher-bnb` wheel on PyPI (Rust core, prebuilt — no toolchain needed).
+dependencies = ["kingfisher-bnb>=0.1", "networkx>=3"]
 
 [project.optional-dependencies]
 # Adapter for plugging results into graphify (reads its graph.json, emits
@@ -16,10 +15,6 @@ graphify = []
 
 [project.scripts]
 graphmine = "graphmine.cli:main"
-
-[tool.uv.sources]
-# Local build of the user's Rust Kingfisher (sibling checkout). Maturin builds it.
-kingfisher-bnb = { path = "../BranchAndBound/kingfisher" }
 
 [build-system]
 requires = ["hatchling"]
