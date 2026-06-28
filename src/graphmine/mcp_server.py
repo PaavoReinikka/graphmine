@@ -36,7 +36,7 @@ class GraphmineService:
         if self.encoder == "cochange":
             enc = git_cochange.encode(
                 self.repo, min_freq=bk.get("min_freq", 3),
-                max_commit_files=bk.get("max_commit_files", 40),
+                max_commit_files=bk.get("max_commit_files", "auto"),
                 subsystem_depth=bk.get("subsystem_depth", "auto"),
                 exclude=tuple(bk.get("exclude", ())))
         else:

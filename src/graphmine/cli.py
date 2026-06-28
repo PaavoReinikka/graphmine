@@ -13,8 +13,8 @@ from . import store
 from .mine import MEASURES
 
 
-def _depth_arg(v):
-    """argparse type for --subsystem-depth: the literal 'auto' or an integer."""
+def _auto_int(v):
+    """argparse type for auto-tunable int args: the literal 'auto' or an integer."""
     if v == "auto":
         return "auto"
     try:
@@ -30,10 +30,17 @@ def _emit(enc, args, corpus, name):
     m = an.enc.meta
     if m.get("subsystem_depth_auto"):
         print(f"[graphmine] auto subsystem-depth: {m.get('subsystem_depth')}", file=sys.stderr)
+    if m.get("max_commit_files_auto"):
+        print(f"[graphmine] commit-size cutoff: {m.get('max_commit_files')} "
+              f"(auto; p50={m.get('commit_size_p50')}, p95={m.get('commit_size_p95')})",
+              file=sys.stderr)
+    scs = m.get("subsystem_commit_size", {})
     for s in an.index["meta"].get("suggestions", []):
+        avg = scs.get(s["subsystem"])
+        prov = f" co-changing via commits averaging {avg} files;" if avg else ""
         print(f"[graphmine] note: {s['share']:.0%} of couplings are within "
-              f"'{s['subsystem']}' (batch clique); consider --exclude {s['subsystem']} "
-              f"or --max-commit-files to surface other structure.", file=sys.stderr)
+              f"'{s['subsystem']}' (batch clique).{prov} consider --exclude "
+              f"{s['subsystem']} or --max-commit-files.", file=sys.stderr)
     md = report_mod.to_markdown(enc, an.couplings, an.clusters, significance=an.significance)
     print(md)
 
@@ -115,7 +122,7 @@ def main(argv=None):
     common.add_argument("--significance", choices=("raw", "tarone"), default="raw",
                         help="raw: p<=alpha (default) | tarone: Fisher-only corrected "
                              "cut p<=alpha/m_eff (also prunes the search -> faster)")
-    common.add_argument("--subsystem-depth", type=_depth_arg, default="auto", metavar="auto|N",
+    common.add_argument("--subsystem-depth", type=_auto_int, default="auto", metavar="auto|N",
                         help="dir depth defining a 'subsystem' for cross-cutting ranking "
                              "(default: auto-detect the component level)")
     common.add_argument("-o", "--out", default=None, metavar="DIR",
@@ -124,7 +131,7 @@ def main(argv=None):
 
     cc = sub.add_parser("cochange", parents=[common], help="git co-change mining")
     cc.add_argument("repo")
-    cc.add_argument("--max-commit-files", type=int, default=40)
+    cc.add_argument("--max-commit-files", type=_auto_int, default="auto", metavar="auto|N")
     cc.add_argument("--min-freq", type=int, default=3)
     cc.add_argument("--exclude", action="append", metavar="SUBSTR",
                     help="drop files whose path contains SUBSTR (repeatable); added to the "
@@ -168,10 +175,10 @@ def main(argv=None):
                     help="pure in-memory; do not write the warm-start cache")
     mp.add_argument("--significance", choices=("raw", "tarone"), default="raw")
     mp.add_argument("--alpha", type=float, default=0.05)
-    mp.add_argument("--subsystem-depth", type=_depth_arg, default="auto", metavar="auto|N")
+    mp.add_argument("--subsystem-depth", type=_auto_int, default="auto", metavar="auto|N")
     mp.add_argument("--exclude", action="append", metavar="SUBSTR")
     mp.add_argument("--min-freq", type=int, default=3)
-    mp.add_argument("--max-commit-files", type=int, default=40)
+    mp.add_argument("--max-commit-files", type=_auto_int, default="auto", metavar="auto|N")
 
     args = p.parse_args(argv)
     if getattr(args, "measure", "fisher") != "fisher":

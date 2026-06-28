@@ -1,5 +1,5 @@
 """Tests for encoder helpers (the subsystem heuristic + auto-depth)."""
-from graphmine.encoders.base import auto_subsystem_depth
+from graphmine.encoders.base import auto_subsystem_depth, commit_size_cutoff
 from graphmine.encoders.git_cochange import _subsystem as cc_sub
 from graphmine.encoders.graph_coref import _subsystem as cr_sub
 
@@ -36,3 +36,12 @@ def test_auto_depth_monorepo_under_src():
 def test_auto_depth_flat_and_monolithic():
     assert auto_subsystem_depth(["a.py", "b.py", "c.py"]) == 1          # root files
     assert auto_subsystem_depth([f"src/{c}.py" for c in "abcde"]) == 1  # flat src, won't split
+
+
+def test_commit_size_cutoff():
+    # normal small commits + a few mega/migration commits -> knee between them
+    sizes = [1, 2, 2, 3, 3, 3, 4, 4, 5] + [60, 80, 120]
+    knee = commit_size_cutoff(sizes)
+    assert 5 <= knee < 60                      # excludes the mega commits, keeps normal ones
+    assert commit_size_cutoff([2, 3]) == 200   # tiny history -> no filtering (cap)
+    assert commit_size_cutoff([3] * 6) == 8    # flat distribution -> floor

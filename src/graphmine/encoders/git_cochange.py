@@ -14,7 +14,7 @@ from __future__ import annotations
 import subprocess
 from collections import defaultdict
 
-from .base import Encoding, auto_subsystem_depth
+from .base import Encoding, auto_subsystem_depth, commit_size_cutoff, percentile
 
 # Files that co-change mechanically and only add noise.
 _DEFAULT_SKIP_EXTS = (".lock", ".sum", ".svg", ".png", ".jpg", ".jpeg", ".gif")
@@ -93,7 +93,7 @@ def encode(
     repo: str,
     *,
     min_commit_files: int = 2,
-    max_commit_files: int = 40,
+    max_commit_files: int | str = "auto",
     min_freq: int = 3,
     max_freq_frac: float = 0.4,
     subsystem_depth: int | str = "auto",
@@ -127,13 +127,18 @@ def encode(
     def canon(f: str) -> str:
         return rename_map.get(f, f)
 
-    commits: list[set[str]] = []
+    candidates: list[set[str]] = []
     for files in commit_filesets:
         mapped = {canon(f) for f in files if keep_file(f)}
         if not include_deleted:
             mapped = {f for f in mapped if f in tracked}
-        if min_commit_files <= len(mapped) <= max_commit_files:
-            commits.append(mapped)
+        if len(mapped) >= min_commit_files:
+            candidates.append(mapped)
+    # auto-knee the max commit size to drop batch/mega commits (Tukey fence)
+    sizes = [len(c) for c in candidates]
+    mcf_auto = max_commit_files == "auto"
+    mcf = commit_size_cutoff(sizes) if mcf_auto else int(max_commit_files)
+    commits = [c for c in candidates if len(c) <= mcf]
 
     freq: dict[str, int] = defaultdict(int)
     for c in commits:
@@ -149,6 +154,13 @@ def encode(
     id_label = {i: f for f, i in fid.items()}
     id_subsystem = {i: _subsystem(f, depth) for f, i in fid.items()}
 
+    # mean commit size per subsystem (batch-provenance for the exclusion advisory)
+    sub_sizes: dict[str, list[int]] = defaultdict(list)
+    for c in commits:
+        for s in {_subsystem(f, depth) for f in c if f in keep}:
+            sub_sizes[s].append(len(c))
+    subsystem_commit_size = {s: round(sum(v) / len(v), 1) for s, v in sub_sizes.items()}
+
     transactions = []
     for c in commits:
         row = sorted(fid[f] for f in c if f in keep)
@@ -161,8 +173,12 @@ def encode(
         id_subsystem=id_subsystem,
         meta={
             "encoder": "git_cochange", "repo": repo, "commits_used": n,
-            "max_commit_files": max_commit_files, "min_freq": min_freq,
-            "include_deleted": include_deleted, "renames_followed": len(rename_map),
+            "max_commit_files": mcf, "max_commit_files_auto": mcf_auto,
+            "min_freq": min_freq, "include_deleted": include_deleted,
+            "renames_followed": len(rename_map),
             "subsystem_depth": depth, "subsystem_depth_auto": auto,
+            "commit_size_p50": round(percentile(sizes, 0.5), 1),
+            "commit_size_p95": round(percentile(sizes, 0.95), 1),
+            "subsystem_commit_size": subsystem_commit_size,
         },
     )

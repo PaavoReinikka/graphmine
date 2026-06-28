@@ -39,6 +39,30 @@ def auto_subsystem_depth(paths, *, max_depth: int = 3, dominance: float = 0.6) -
     return best
 
 
+def percentile(xs, p: float) -> float:
+    """Linear-interpolation percentile of ``xs`` at fraction ``p`` (0..1)."""
+    xs = sorted(xs)
+    if not xs:
+        return 0.0
+    k = (len(xs) - 1) * p
+    lo = int(k)
+    hi = min(lo + 1, len(xs) - 1)
+    return xs[lo] + (xs[hi] - xs[lo]) * (k - lo)
+
+
+def commit_size_cutoff(sizes, *, floor: int = 8, cap: int = 200) -> int:
+    """Knee for dropping outlier 'mega' commits (migrations, reformats, vendored
+    drops) that manufacture cheap cliques. Tukey upper fence ``Q3 + 1.5*IQR``,
+    floored (don't drop normal multi-file commits) and capped. Returns ``cap`` for
+    tiny histories (no meaningful filtering)."""
+    sizes = [s for s in sizes if s >= 1]
+    if len(sizes) < 4:
+        return cap
+    q1, q3 = percentile(sizes, 0.25), percentile(sizes, 0.75)
+    fence = q3 + 1.5 * (q3 - q1)
+    return max(floor, min(cap, int(round(fence))))
+
+
 @dataclass
 class Encoding:
     #: one transaction per row; each a sorted list of item ids present
