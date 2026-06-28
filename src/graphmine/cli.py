@@ -152,6 +152,9 @@ def main(argv=None):
     br.add_argument("--alpha", type=float, default=None,
                     help="re-threshold at this alpha (tightens only; default: as built)")
     br.add_argument("--depth", type=int, default=1, help="hops to expand (1 = direct)")
+    br.add_argument("--rank-by", choices=("p", "confidence", "lift"), default="p",
+                    help="order by significance (p, default), confidence "
+                         "P(neighbour|seed), or lift")
     br.add_argument("--limit", type=int, default=None, help="cap number of results")
     br.add_argument("--json", action="store_true", dest="as_json",
                     help="machine-readable JSON output")
@@ -203,7 +206,7 @@ def main(argv=None):
             print("[graphmine] provide --file PATH or --changed a,b,...", file=sys.stderr)
             return 1
         res = query.blast_radius(idx, seeds, alpha=args.alpha, depth=args.depth,
-                                 limit=args.limit)
+                                 limit=args.limit, rank_by=args.rank_by)
         if args.as_json:
             print(json.dumps({"seeds": [s.replace("\\", "/") for s in seeds],
                               "impacted": res}, indent=2))
@@ -216,7 +219,9 @@ def main(argv=None):
             for r in res:
                 tag = "  [cross]" if r["cross_subsystem"] else ""
                 hop = f"  h{r['hops']}" if args.depth > 1 else ""
-                print(f"  p={r['p_raw']:.1e}{hop}{tag}  {r['file']}")
+                conf = r.get("confidence")
+                cstr = f" conf={conf:.2f}" if conf is not None else ""
+                print(f"  p={r['p_raw']:.1e}{cstr}{hop}{tag}  {r['file']}")
     elif args.cmd == "mcp":
         if not (args.repo or args.index):
             print("[graphmine] provide --repo or --index", file=sys.stderr)

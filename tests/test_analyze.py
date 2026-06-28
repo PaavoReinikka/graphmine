@@ -30,6 +30,14 @@ def test_analyze_build_tarone_sets_m_eff():
     assert s["spectrum"]                            # spectrum stored for offline re-query
 
 
+def test_analyze_carries_effect_sizes():
+    an = analyze.build(_enc_signal(), policy="raw", alpha=0.05)
+    cps = an.index["couplings"]
+    assert cps and all("freq_ab" in c and "lift" in c for c in cps)
+    some = next(iter(an.index["by_file"].values()))["couples_with"][0]
+    assert "confidence" in some
+
+
 def test_analyze_records_suggestions_key():
     an = analyze.build(_enc_signal(), policy="raw", alpha=0.05)
     assert isinstance(an.index["meta"].get("suggestions"), list)

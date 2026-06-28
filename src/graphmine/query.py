@@ -58,7 +58,8 @@ def effective_threshold(index: dict, alpha: float | None) -> float:
 
 
 def blast_radius(index: dict, files, *, alpha: float | None = None,
-                 depth: int = 1, limit: int | None = None) -> list[dict]:
+                 depth: int = 1, limit: int | None = None,
+                 rank_by: str = "p") -> list[dict]:
     """Files that typically change with ``files`` (the seed), ranked by p.
 
     ``depth=1`` is the direct co-change neighbourhood; ``depth>1`` expands
@@ -87,7 +88,8 @@ def blast_radius(index: dict, files, *, alpha: float | None = None,
                     continue
                 if nb not in cand or w["p_raw"] < cand[nb]["p_raw"]:
                     cand[nb] = {"file": nb, "p_raw": w["p_raw"],
-                                "cross_subsystem": w["cross_subsystem"], "hops": hop}
+                                "cross_subsystem": w["cross_subsystem"], "hops": hop,
+                                "confidence": w.get("confidence"), "lift": w.get("lift")}
         if not cand:
             break
         for nb, rec in cand.items():
@@ -95,7 +97,12 @@ def blast_radius(index: dict, files, *, alpha: float | None = None,
             out.append(rec)
         frontier = list(cand)
 
-    out.sort(key=lambda r: (r["hops"], r["p_raw"]))
+    _key = {
+        "p": lambda r: (r["hops"], r["p_raw"]),
+        "confidence": lambda r: (r["hops"], -(r.get("confidence") or 0.0)),
+        "lift": lambda r: (r["hops"], -(r.get("lift") or 0.0)),
+    }.get(rank_by, lambda r: (r["hops"], r["p_raw"]))
+    out.sort(key=_key)
     return out[:limit] if limit else out
 
 

@@ -1,8 +1,8 @@
 """Unit tests for postprocessing — no Kingfisher needed (pure logic)."""
 from graphmine.encoders.base import Encoding
 from graphmine.mine import Rule
-from graphmine.postprocess import (by_file_index, clusters, pairwise_couplings,
-                                   significant, suggest_exclusions)
+from graphmine.postprocess import (Coupling, by_file_index, clusters,
+                                   pairwise_couplings, significant, suggest_exclusions)
 
 
 def _enc():
@@ -66,6 +66,19 @@ def test_by_file_index_adjacency_and_sort():
     files = [w["file"] for w in ax["couples_with"]]
     assert files == ["a/y", "b/p"]            # sorted by p (1e-6 before 1e-4)
     assert bf["a/y"]["couples_with"][0]["file"] == "a/x"
+
+
+def test_by_file_index_effect_sizes():
+    # n=20 commits; a in 10, b in 4, co-occur 4
+    enc = Encoding(transactions=[[0]] * 20,
+                   id_label={0: "a/x", 1: "a/y"}, id_subsystem={0: "a", 1: "a"})
+    cp = Coupling(a=0, b=1, p_raw=1e-6, cross_subsystem=False,
+                  freq_a=10, freq_b=4, freq_ab=4)
+    bf = by_file_index([cp], [], enc)
+    ax = bf["a/x"]["couples_with"][0]            # seed a/x: P(a/y | a/x) = 4/10
+    assert ax["confidence"] == 0.4 and ax["lift"] == 2.0
+    ay = bf["a/y"]["couples_with"][0]            # seed a/y: P(a/x | a/y) = 4/4
+    assert ay["confidence"] == 1.0
 
 
 def test_suggest_exclusions_flags_dominant_subsystem():

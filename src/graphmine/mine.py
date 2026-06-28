@@ -27,6 +27,9 @@ class Rule:
     measure_type: int
     score: float            # comparable score (Fisher: p; others: the statistic)
     p: float | None         # raw Fisher p-value, or None when the measure has no p
+    freq_x: int = 0         # support of the antecedent itemset
+    freq_xa: int = 0        # co-occurrence count (antecedent & consequent)
+    freq_a: int = 0         # support of the consequent
 
 
 def mine(
@@ -62,7 +65,8 @@ def mine(
             p = None
             score = -r.measure_value            # stored negated so smaller=better
         out.append(Rule(tuple(r.antecedent), r.consequent, bool(r.is_negative),
-                         mt, score, p))
+                         mt, score, p, freq_x=r.frequency_x, freq_xa=r.frequency_xa,
+                         freq_a=r.frequency_a))
     return out
 
 

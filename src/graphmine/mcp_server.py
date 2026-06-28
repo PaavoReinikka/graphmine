@@ -64,9 +64,9 @@ class GraphmineService:
 
     # --- operations (also the MCP tools) -----------------------------------
     def blast_radius(self, files: list[str], alpha: float | None = None,
-                     depth: int = 1, limit: int | None = 50) -> dict:
+                     depth: int = 1, limit: int | None = 50, rank_by: str = "p") -> dict:
         impacted = query.blast_radius(self.index, files, alpha=alpha,
-                                      depth=depth, limit=limit)
+                                      depth=depth, limit=limit, rank_by=rank_by)
         unknown = [f for f in files if not query.known_file(self.index, f)]
         return {"seeds": [f.replace("\\", "/") for f in files],
                 "impacted": impacted, "unknown_seeds": unknown}
@@ -103,12 +103,13 @@ def build_mcp(service: GraphmineService):
 
     @mcp.tool()
     def blast_radius(files: list[str], alpha: float | None = None,
-                     depth: int = 1, limit: int = 50) -> dict:
+                     depth: int = 1, limit: int = 50, rank_by: str = "p") -> dict:
         """Files that have historically changed together with the given file(s).
 
         Use this to gauge the impact of editing a file ("what else usually moves
         with it?") or, given several files you are about to change, what else the
-        change tends to pull in. Ranked by p (smaller = stronger coupling).
+        change tends to pull in. Each hit carries `p` (significance), `confidence`
+        = P(neighbour changes | seed changes), and `lift`.
 
         Args:
             files: repo-relative path(s) to seed from (union of their radii).
@@ -116,8 +117,10 @@ def build_mcp(service: GraphmineService):
                 threshold.
             depth: hops to expand (1 = direct co-change neighbours).
             limit: max results.
+            rank_by: "p" (significance, default), "confidence", or "lift".
         """
-        return service.blast_radius(files, alpha=alpha, depth=depth, limit=limit)
+        return service.blast_radius(files, alpha=alpha, depth=depth, limit=limit,
+                                    rank_by=rank_by)
 
     @mcp.tool()
     def refresh() -> dict:
