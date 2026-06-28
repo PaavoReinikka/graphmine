@@ -31,7 +31,7 @@ graphmine writes **nothing into the project**: indexes cache in `~/.graphmine/<r
 
 1. **Build** the index (once per repo; rebuild after new commits):
    ```bash
-   graphmine cochange <repo> --significance tarone
+   graphmine cochange <repo> --significance tarone        # add -v for drill-in suggestions
    ```
 2. **Query** a file's blast radius (instant, reads the cache):
    ```bash

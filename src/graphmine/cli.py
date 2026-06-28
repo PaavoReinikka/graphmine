@@ -57,6 +57,16 @@ def _emit(enc, args, corpus, name):
         out_dir = str(store.cache_dir(corpus))
         print(f"\n[graphmine] cached index -> {jpath}  (use -o DIR to write in-project)")
 
+    if getattr(args, "verbose", False):
+        bf = an.index.get("by_file", {})
+        top = sorted(bf, key=lambda f: len(bf[f]["couples_with"]), reverse=True)[:3]
+        if top:
+            target = f"--repo {corpus}" if name == "cochange" else jpath
+            print("\n[graphmine] drill in — most-coupled files (try blast-radius):")
+            for f in top:
+                print(f"  graphmine blast-radius {target} --file {f}"
+                      f"   # {len(bf[f]['couples_with'])} couplings")
+
     graph_path = getattr(args, "graphify_graph", None)
     if graph_path:
         from .adapters import graphify as gfy
@@ -128,6 +138,9 @@ def main(argv=None):
     common.add_argument("-o", "--out", default=None, metavar="DIR",
                         help="write index+report into DIR in the project; default is a "
                              "global cache (~/.graphmine/<repo>/), leaving the project clean")
+    common.add_argument("-v", "--verbose", action="store_true",
+                        help="also print drill-in suggestions (ready-to-run blast-radius "
+                             "commands for the most-coupled files)")
 
     cc = sub.add_parser("cochange", parents=[common], help="git co-change mining")
     cc.add_argument("repo")

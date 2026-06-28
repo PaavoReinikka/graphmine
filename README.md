@@ -34,6 +34,7 @@ encoder (corpus → transactions+labels) → mine (Kingfisher) → postprocess �
 uv sync                                    # installs deps incl. the kingfisher-bnb wheel (no toolchain)
 uv run graphmine cochange /path/to/repo    # caches the index in ~/.graphmine/<repo>/ (project stays clean)
 uv run graphmine cochange /path/to/repo -o out/   # opt in to writing index+report into the project
+uv run graphmine cochange /path/to/repo -v  # also print drill-in blast-radius suggestions
 uv run graphmine coref graph.json          # static co-reference mining
 # significance: --significance raw (default) | tarone   (Fisher-only; also prunes -> faster)
 # filtering: --exclude SUBSTR (e.g. src/database) | --auto-exclude (drop batch cliques) | --min-freq
