@@ -37,12 +37,16 @@ uv run graphmine cochange /path/to/repo -o out/   # opt in to writing index+repo
 uv run graphmine coref graph.json          # static co-reference mining
 # significance: --significance raw (default) | tarone   (Fisher-only; also prunes -> faster)
 # filtering: --exclude SUBSTR (repeatable, e.g. --exclude src/database) --min-freq --max-commit-files
-# tuning: --alpha --subsystem-depth --measure {fisher,chi2,mi,leverage}  (couplings are Fisher-only)
+# tuning: --alpha --subsystem-depth (auto|N; default auto) --measure {fisher,chi2,mi,leverage; Fisher-only}
 ```
 
 By default graphmine writes **nothing into your project** — a built index goes to a
 global per-repo cache (`~/.graphmine/<repo>/`, honoring `$XDG_CACHE_HOME`). Pass
 `-o DIR` to write the index + Markdown report into the project instead.
+
+graphmine **auto-detects `--subsystem-depth`** (and prints what it chose; pass an
+integer to override) and, when one directory dominates the co-change (a
+batch-migrated clique like a DB schema), prints a hint to `--exclude` it.
 
 ### Blast radius (which files change with this one)
 

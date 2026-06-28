@@ -42,12 +42,15 @@ graphmine writes **nothing into the project**: indexes cache in `~/.graphmine/<r
 
 ## Choosing settings (learned from real repos)
 
-- **`--subsystem-depth` = the level where your top-level components live.** It only
-  affects the cross-subsystem *ranking* (`[cross]`), not the couplings themselves.
-  - Components at the top level (e.g. `src/`, `tests/`, `docs/`) → **depth 1** (e.g. Flask).
-  - Monorepo with everything under one dir (`src/console`, `src/database`, …) → **depth 2** (e.g. an Azure monorepo).
+- **`--subsystem-depth` is auto-detected** (graphmine prints the chosen depth; pass
+  an integer to override). It picks the level where components live — top-level
+  `src/`, `tests/`, `docs/` → depth 1 (Flask); everything under one dir
+  (`src/console`, `src/database`, …) → depth 2 (a monorepo). It only affects the
+  cross-subsystem *ranking* (`[cross]`), not the couplings themselves.
 - **Exclude noisy, batch-committed dirs.** Files committed in large batches (DB
   schema/migrations, generated code) form a giant clique that drowns real coupling.
+  graphmine **auto-flags** a dominant clique after mining (e.g. "92% of couplings
+  within `src/database`; consider --exclude …") — follow the hint when it appears:
   ```bash
   graphmine cochange <repo> --exclude src/database          # drop a component
   graphmine cochange <repo> --max-commit-files 15           # or drop big commits
