@@ -2,7 +2,7 @@
 from graphmine.encoders.base import Encoding
 from graphmine.mine import Rule
 from graphmine.postprocess import (by_file_index, clusters, pairwise_couplings,
-                                   significant)
+                                   significant, suggest_exclusions)
 
 
 def _enc():
@@ -66,3 +66,19 @@ def test_by_file_index_adjacency_and_sort():
     files = [w["file"] for w in ax["couples_with"]]
     assert files == ["a/y", "b/p"]            # sorted by p (1e-6 before 1e-4)
     assert bf["a/y"]["couples_with"][0]["file"] == "a/x"
+
+
+def test_suggest_exclusions_flags_dominant_subsystem():
+    enc = _enc()
+    rules = [_fisher(0, 1, 1e-6), _fisher(1, 2, 1e-6), _fisher(0, 2, 1e-6),  # 3 within "a"
+             _fisher(3, 4, 1e-6)]                                            # 1 within "b"
+    sig = significant(pairwise_couplings(rules, enc), alpha=0.05)
+    sg = suggest_exclusions(sig, enc, min_share=0.4)
+    assert len(sg) == 1 and sg[0]["subsystem"] == "a" and sg[0]["within_couplings"] == 3
+
+
+def test_suggest_exclusions_none_when_no_dominant():
+    enc = _enc()
+    rules = [_fisher(0, 3, 1e-6), _fisher(1, 4, 1e-6)]   # both cross a<->b, no within
+    sig = significant(pairwise_couplings(rules, enc), alpha=0.05)
+    assert suggest_exclusions(sig, enc) == []

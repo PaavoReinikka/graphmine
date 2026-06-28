@@ -30,6 +30,11 @@ def test_analyze_build_tarone_sets_m_eff():
     assert s["spectrum"]                            # spectrum stored for offline re-query
 
 
+def test_analyze_records_suggestions_key():
+    an = analyze.build(_enc_signal(), policy="raw", alpha=0.05)
+    assert isinstance(an.index["meta"].get("suggestions"), list)
+
+
 def test_resolve_significance_fisher_gating():
     # tarone requested with a non-Fisher measure -> silently falls back to raw
     s = resolve_significance(_enc_signal(), policy="tarone", alpha=0.05, measure="chi2")
