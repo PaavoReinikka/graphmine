@@ -17,10 +17,25 @@ from collections import defaultdict
 from .base import Encoding, auto_subsystem_depth, commit_size_cutoff, percentile
 
 # Files that co-change mechanically and only add noise.
-_DEFAULT_SKIP_EXTS = (".lock", ".sum", ".svg", ".png", ".jpg", ".jpeg", ".gif")
+_DEFAULT_SKIP_EXTS = (
+    ".lock", ".sum", ".svg", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico",
+    ".pdf", ".woff", ".woff2", ".ttf", ".map", ".min.js", ".min.css", ".snap", ".pyc",
+)
 _DEFAULT_SKIP_SUBSTRINGS = (
     "node_modules/", ".venv/", "graphify-out/", "/dist/", "/build/", "/target/",
+    ".vscode/", ".idea/", "__pycache__/", ".pytest_cache/", ".mypy_cache/",
+    ".ruff_cache/", ".terraform/", ".next/", ".nuxt/", ".svelte-kit/", ".azurite/",
+    "__snapshots__/", "/vendor/", "/coverage/", "package-lock.json", "pnpm-lock.yaml",
 )
+
+
+def keep_file(path: str, skip_exts: tuple = _DEFAULT_SKIP_EXTS,
+              skips: tuple = _DEFAULT_SKIP_SUBSTRINGS) -> bool:
+    """True if a path is real source — not an artifact/cache/vendored tree/lockfile."""
+    fl = path.lower()
+    if any(fl.endswith(e) for e in skip_exts):
+        return False
+    return not any(s in fl for s in skips)
 
 
 def _subsystem(path: str, depth: int = 1) -> str:
@@ -114,12 +129,6 @@ def encode(
     # user --exclude substrings are added to the built-in skips (path-normalized, lowercased)
     skips = tuple(skip_substrings) + tuple(s.replace("\\", "/").lower() for s in exclude)
 
-    def keep_file(f: str) -> bool:
-        fl = f.lower()
-        if any(fl.endswith(e) for e in skip_exts):
-            return False
-        return not any(s in fl for s in skips)
-
     commit_filesets = list(_parse_log(repo))
     rename_map = _canonical_map(getattr(_parse_log, "renames", {}))
     tracked = _tracked_files(repo)
@@ -129,7 +138,7 @@ def encode(
 
     candidates: list[set[str]] = []
     for files in commit_filesets:
-        mapped = {canon(f) for f in files if keep_file(f)}
+        mapped = {canon(f) for f in files if keep_file(f, skip_exts, skips)}
         if not include_deleted:
             mapped = {f for f in mapped if f in tracked}
         if len(mapped) >= min_commit_files:
