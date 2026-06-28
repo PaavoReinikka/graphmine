@@ -13,10 +13,27 @@ from . import store
 from .mine import MEASURES
 
 
+def _depth_arg(v):
+    """argparse type for --subsystem-depth: the literal 'auto' or an integer."""
+    if v == "auto":
+        return "auto"
+    try:
+        return int(v)
+    except ValueError:
+        raise argparse.ArgumentTypeError("must be 'auto' or an integer")
+
+
 def _emit(enc, args, corpus, name):
     an = analyze.build(enc, q=args.q, l_max=args.l_max, t_type=args.t_type,
                        measure=args.measure, policy=args.significance, alpha=args.alpha,
                        git_head=store.git_head(corpus))
+    m = an.enc.meta
+    if m.get("subsystem_depth_auto"):
+        print(f"[graphmine] auto subsystem-depth: {m.get('subsystem_depth')}", file=sys.stderr)
+    for s in an.index["meta"].get("suggestions", []):
+        print(f"[graphmine] note: {s['share']:.0%} of couplings are within "
+              f"'{s['subsystem']}' (batch clique); consider --exclude {s['subsystem']} "
+              f"or --max-commit-files to surface other structure.", file=sys.stderr)
     md = report_mod.to_markdown(enc, an.couplings, an.clusters, significance=an.significance)
     print(md)
 
@@ -75,10 +92,11 @@ def _resolve_index(args):
 
 def main(argv=None):
     # Markdown digest uses non-ASCII (⇔, ·); force UTF-8 stdout on Windows cp1252.
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except (AttributeError, ValueError):
-        pass
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
 
     p = argparse.ArgumentParser(prog="graphmine")
     p.add_argument("--version", action="version", version=f"graphmine {__version__}")
@@ -97,8 +115,9 @@ def main(argv=None):
     common.add_argument("--significance", choices=("raw", "tarone"), default="raw",
                         help="raw: p<=alpha (default) | tarone: Fisher-only corrected "
                              "cut p<=alpha/m_eff (also prunes the search -> faster)")
-    common.add_argument("--subsystem-depth", type=int, default=1,
-                        help="path depth that defines a 'subsystem' for cross-cutting ranking")
+    common.add_argument("--subsystem-depth", type=_depth_arg, default="auto", metavar="auto|N",
+                        help="dir depth defining a 'subsystem' for cross-cutting ranking "
+                             "(default: auto-detect the component level)")
     common.add_argument("-o", "--out", default=None, metavar="DIR",
                         help="write index+report into DIR in the project; default is a "
                              "global cache (~/.graphmine/<repo>/), leaving the project clean")
@@ -146,7 +165,7 @@ def main(argv=None):
                     help="pure in-memory; do not write the warm-start cache")
     mp.add_argument("--significance", choices=("raw", "tarone"), default="raw")
     mp.add_argument("--alpha", type=float, default=0.05)
-    mp.add_argument("--subsystem-depth", type=int, default=1)
+    mp.add_argument("--subsystem-depth", type=_depth_arg, default="auto", metavar="auto|N")
     mp.add_argument("--exclude", action="append", metavar="SUBSTR")
     mp.add_argument("--min-freq", type=int, default=3)
     mp.add_argument("--max-commit-files", type=int, default=40)

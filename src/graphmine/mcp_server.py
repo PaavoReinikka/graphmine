@@ -37,11 +37,11 @@ class GraphmineService:
             enc = git_cochange.encode(
                 self.repo, min_freq=bk.get("min_freq", 3),
                 max_commit_files=bk.get("max_commit_files", 40),
-                subsystem_depth=bk.get("subsystem_depth", 1),
+                subsystem_depth=bk.get("subsystem_depth", "auto"),
                 exclude=tuple(bk.get("exclude", ())))
         else:
             enc = graph_coref.encode(self.repo,
-                                     subsystem_depth=bk.get("subsystem_depth", 1))
+                                     subsystem_depth=bk.get("subsystem_depth", "auto"))
         an = analyze.build(enc, policy=bk.get("policy", "raw"),
                            alpha=bk.get("alpha", 0.05),
                            git_head=store.git_head(self.repo))

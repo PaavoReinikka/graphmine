@@ -38,4 +38,5 @@ def build(enc: Encoding, *, q: int = 400, l_max: int = 2, t_type: int = 1,
     by_file = pp.by_file_index(sig_couplings, clusters, enc)
     index = report.to_dict(enc, sig_couplings, clusters,
                            by_file=by_file, significance=sig, git_head=git_head)
+    index["meta"]["suggestions"] = pp.suggest_exclusions(sig_couplings, enc)
     return Analysis(enc, sig_couplings, clusters, sig, index)

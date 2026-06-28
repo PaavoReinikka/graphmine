@@ -7,7 +7,36 @@ postprocessing to rank cross-cutting relations above within-subsystem ones).
 """
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
+
+
+def auto_subsystem_depth(paths, *, max_depth: int = 3, dominance: float = 0.6) -> int:
+    """Pick the directory depth at which a repo's components live.
+
+    Works on the *directory* prefixes of the item paths (filename dropped, matching
+    ``_subsystem``). Descends depth 1..max_depth while one subsystem dominates;
+    returns the shallowest depth where the largest subsystem holds <= ``dominance``
+    of the items, and stops early once going deeper no longer reduces that dominance
+    (a flat/monolithic dir won't split). Capped at ``max_depth``.
+
+    Examples: top-level components (src/, tests/, docs/) -> 1; everything under
+    src/ (src/console, src/database, ...) -> 2; a flat repo -> 1.
+    """
+    dirsets = [p.replace("\\", "/").split("/")[:-1] for p in paths]
+    dirsets = [d for d in dirsets if d]                 # ignore root-level files
+    if not dirsets:
+        return 1
+    best, prev_top = 1, 1.1
+    for depth in range(1, max_depth + 1):
+        subs = Counter("/".join(d[:depth]) for d in dirsets)
+        top_share = max(subs.values()) / sum(subs.values())
+        if top_share <= dominance:
+            return depth                                # components are spread out here
+        if top_share >= prev_top - 1e-9:
+            return best                                 # deeper didn't reduce dominance
+        prev_top, best = top_share, depth
+    return best
 
 
 @dataclass

@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from collections import defaultdict
 
-from .base import Encoding
+from .base import Encoding, auto_subsystem_depth
 
 _REF_RELS = {"calls", "imports", "imports_from", "uses", "references", "inherits", "method"}
 
@@ -25,7 +25,7 @@ def _subsystem(path: str | None, depth: int = 1) -> str:
 
 
 def encode(graph_json: str, *, min_freq: int = 2, max_freq_frac: float = 0.6,
-           subsystem_depth: int = 1) -> Encoding:
+           subsystem_depth: int | str = "auto") -> Encoding:
     g = json.loads(open(graph_json, encoding="utf-8").read())
     nodes = {n["id"]: n for n in g["nodes"]}
 
@@ -50,9 +50,13 @@ def encode(graph_json: str, *, min_freq: int = 2, max_freq_frac: float = 0.6,
             counts[it] += 1
     keep = {it for it, c in counts.items() if c >= min_freq and c <= max_freq_frac * n}
 
+    auto = subsystem_depth == "auto"
+    paths = [p for p in (nodes[it].get("source_file") for it in keep) if p]
+    depth = auto_subsystem_depth(paths) if auto else int(subsystem_depth)
+
     iid = {it: i for i, it in enumerate(sorted(keep))}
     id_label = {i: nodes[it].get("label", it) for it, i in iid.items()}
-    id_subsystem = {i: _subsystem(nodes[it].get("source_file"), subsystem_depth)
+    id_subsystem = {i: _subsystem(nodes[it].get("source_file"), depth)
                     for it, i in iid.items()}
 
     transactions = []
@@ -63,4 +67,5 @@ def encode(graph_json: str, *, min_freq: int = 2, max_freq_frac: float = 0.6,
 
     return Encoding(transactions=transactions, id_label=id_label,
                     id_subsystem=id_subsystem,
-                    meta={"encoder": "graph_coref", "graph": graph_json, "files": n})
+                    meta={"encoder": "graph_coref", "graph": graph_json, "files": n,
+                          "subsystem_depth": depth, "subsystem_depth_auto": auto})

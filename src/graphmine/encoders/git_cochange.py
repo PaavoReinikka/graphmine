@@ -14,7 +14,7 @@ from __future__ import annotations
 import subprocess
 from collections import defaultdict
 
-from .base import Encoding
+from .base import Encoding, auto_subsystem_depth
 
 # Files that co-change mechanically and only add noise.
 _DEFAULT_SKIP_EXTS = (".lock", ".sum", ".svg", ".png", ".jpg", ".jpeg", ".gif")
@@ -96,7 +96,7 @@ def encode(
     max_commit_files: int = 40,
     min_freq: int = 3,
     max_freq_frac: float = 0.4,
-    subsystem_depth: int = 1,
+    subsystem_depth: int | str = "auto",
     include_deleted: bool = False,
     skip_exts: tuple = _DEFAULT_SKIP_EXTS,
     skip_substrings: tuple = _DEFAULT_SKIP_SUBSTRINGS,
@@ -142,9 +142,12 @@ def encode(
     n = len(commits)
     keep = {f for f, c in freq.items() if c >= min_freq and c <= max_freq_frac * n}
 
+    auto = subsystem_depth == "auto"
+    depth = auto_subsystem_depth(keep) if auto else int(subsystem_depth)
+
     fid = {f: i for i, f in enumerate(sorted(keep))}
     id_label = {i: f for f, i in fid.items()}
-    id_subsystem = {i: _subsystem(f, subsystem_depth) for f, i in fid.items()}
+    id_subsystem = {i: _subsystem(f, depth) for f, i in fid.items()}
 
     transactions = []
     for c in commits:
@@ -160,5 +163,6 @@ def encode(
             "encoder": "git_cochange", "repo": repo, "commits_used": n,
             "max_commit_files": max_commit_files, "min_freq": min_freq,
             "include_deleted": include_deleted, "renames_followed": len(rename_map),
+            "subsystem_depth": depth, "subsystem_depth_auto": auto,
         },
     )

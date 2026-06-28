@@ -100,6 +100,33 @@ def by_file_index(couplings: list[Coupling], clusters: list[Cluster],
     return {lab[i]: e for i, e in adj.items()}
 
 
+def suggest_exclusions(couplings: list[Coupling], enc: Encoding, *,
+                       min_share: float = 0.5) -> list[dict]:
+    """Flag a subsystem that dominates the couplings (a batch-migrated clique).
+
+    Dirs whose files are committed in big batches (DB schema, migrations, generated
+    code) form a giant within-subsystem clique that drowns real structure. If the
+    most-coupled subsystem accounts for >= ``min_share`` of *all* couplings, return
+    it as a hint to ``--exclude``; otherwise return nothing.
+    """
+    if not couplings:
+        return []
+    from collections import Counter
+    within: Counter = Counter()
+    for c in couplings:
+        sa, sb = enc.subsystem(c.a), enc.subsystem(c.b)
+        if sa == sb and sa not in ("(root)", "?"):
+            within[sa] += 1
+    total = len(couplings)
+    out = []
+    for sub, cnt in within.most_common(1):
+        share = cnt / total
+        if share >= min_share:
+            out.append({"subsystem": sub, "within_couplings": cnt,
+                        "share": round(share, 3)})
+    return out
+
+
 def _build_cluster(members: set[int], couplings: list[Coupling], enc: Encoding) -> Cluster:
     ps = [c.p_raw for c in couplings if c.a in members and c.b in members]
     subs = sorted({enc.subsystem(m) for m in members})
