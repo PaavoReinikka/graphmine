@@ -33,15 +33,26 @@ class GraphmineService:
         if not self.repo:
             raise ValueError("cannot build an index without a repo")
         bk = self.build_kwargs
-        if self.encoder == "cochange":
-            enc = git_cochange.encode(
-                self.repo, min_freq=bk.get("min_freq", 3),
-                max_commit_files=bk.get("max_commit_files", "auto"),
-                subsystem_depth=bk.get("subsystem_depth", "auto"),
-                exclude=tuple(bk.get("exclude", ())))
-        else:
-            enc = graph_coref.encode(self.repo,
-                                     subsystem_depth=bk.get("subsystem_depth", "auto"))
+
+        def _encode(extra_exclude=()):
+            if self.encoder == "cochange":
+                return git_cochange.encode(
+                    self.repo, min_freq=bk.get("min_freq", 3),
+                    max_commit_files=bk.get("max_commit_files", "auto"),
+                    subsystem_depth=bk.get("subsystem_depth", "auto"),
+                    exclude=tuple(bk.get("exclude", ())) + tuple(extra_exclude))
+            return graph_coref.encode(self.repo,
+                                      subsystem_depth=bk.get("subsystem_depth", "auto"))
+
+        enc = _encode()
+        if bk.get("auto_exclude") and self.encoder == "cochange":
+            from . import postprocess as pp
+            first = analyze.build(enc, policy=bk.get("policy", "raw"),
+                                  alpha=bk.get("alpha", 0.05))
+            batch = pp.detect_batch_dirs(first.couplings, enc)
+            if batch:
+                enc = _encode(batch)
+                enc.meta["auto_excluded"] = batch
         an = analyze.build(enc, policy=bk.get("policy", "raw"),
                            alpha=bk.get("alpha", 0.05),
                            git_head=store.git_head(self.repo))

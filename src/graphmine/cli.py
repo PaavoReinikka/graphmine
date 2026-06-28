@@ -136,6 +136,9 @@ def main(argv=None):
     cc.add_argument("--exclude", action="append", metavar="SUBSTR",
                     help="drop files whose path contains SUBSTR (repeatable); added to the "
                          "built-in skips, e.g. --exclude src/database")
+    cc.add_argument("--auto-exclude", action="store_true",
+                    help="detect and drop dominant batch-clique dirs automatically "
+                         "(opt-in; reports what it dropped)")
     cc.add_argument("--include-deleted", action="store_true",
                     help="keep deleted / old-rename files (archaeology); default prunes "
                          "to currently-tracked files with rename-following")
@@ -177,6 +180,7 @@ def main(argv=None):
     mp.add_argument("--alpha", type=float, default=0.05)
     mp.add_argument("--subsystem-depth", type=_auto_int, default="auto", metavar="auto|N")
     mp.add_argument("--exclude", action="append", metavar="SUBSTR")
+    mp.add_argument("--auto-exclude", action="store_true")
     mp.add_argument("--min-freq", type=int, default=3)
     mp.add_argument("--max-commit-files", type=_auto_int, default="auto", metavar="auto|N")
 
@@ -190,10 +194,21 @@ def main(argv=None):
 
     if args.cmd == "cochange":
         from .encoders import git_cochange
-        enc = git_cochange.encode(args.repo, max_commit_files=args.max_commit_files,
-                                  min_freq=args.min_freq, subsystem_depth=args.subsystem_depth,
-                                  include_deleted=args.include_deleted,
-                                  exclude=tuple(args.exclude or []))
+        from . import postprocess as pp
+        ekw = dict(max_commit_files=args.max_commit_files, min_freq=args.min_freq,
+                   subsystem_depth=args.subsystem_depth, include_deleted=args.include_deleted)
+        excl = list(args.exclude or [])
+        enc = git_cochange.encode(args.repo, exclude=tuple(excl), **ekw)
+        if args.auto_exclude:
+            first = analyze.build(enc, q=args.q, l_max=args.l_max, t_type=args.t_type,
+                                  measure=args.measure, policy=args.significance, alpha=args.alpha)
+            batch = pp.detect_batch_dirs(first.couplings, enc)
+            if batch:
+                excl += batch
+                enc = git_cochange.encode(args.repo, exclude=tuple(excl), **ekw)
+                enc.meta["auto_excluded"] = batch
+                print(f"[graphmine] auto-excluded batch dir(s): {', '.join(batch)}",
+                      file=sys.stderr)
         _emit(enc, args, args.repo, "cochange")
     elif args.cmd == "coref":
         from .encoders import graph_coref
@@ -243,7 +258,8 @@ def main(argv=None):
                          use_cache=not args.no_cache, policy=args.significance,
                          alpha=args.alpha, subsystem_depth=args.subsystem_depth,
                          exclude=tuple(args.exclude or []), min_freq=args.min_freq,
-                         max_commit_files=args.max_commit_files)
+                         max_commit_files=args.max_commit_files,
+                         auto_exclude=args.auto_exclude)
     return 0
 
 

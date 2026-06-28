@@ -1,8 +1,11 @@
 """Unit tests for postprocessing — no Kingfisher needed (pure logic)."""
 from graphmine.encoders.base import Encoding
 from graphmine.mine import Rule
+import itertools
+
 from graphmine.postprocess import (Coupling, by_file_index, clusters,
-                                   pairwise_couplings, significant, suggest_exclusions)
+                                   detect_batch_dirs, pairwise_couplings,
+                                   significant, suggest_exclusions)
 
 
 def _enc():
@@ -95,3 +98,31 @@ def test_suggest_exclusions_none_when_no_dominant():
     rules = [_fisher(0, 3, 1e-6), _fisher(1, 4, 1e-6)]   # both cross a<->b, no within
     sig = significant(pairwise_couplings(rules, enc), alpha=0.05)
     assert suggest_exclusions(sig, enc) == []
+
+
+def _db_couplings():
+    # a dense 4-file "db" clique (6 pairs) + one unrelated "app" pair
+    cps = [Coupling(a=a, b=b, p_raw=1e-6, cross_subsystem=False)
+           for a, b in itertools.combinations([0, 1, 2, 3], 2)]
+    cps.append(Coupling(a=4, b=5, p_raw=1e-6, cross_subsystem=False))
+    return cps
+
+
+def _enc_batch(avg_commit_size):
+    e = Encoding(transactions=[],
+                 id_label={0: "db/a", 1: "db/b", 2: "db/c", 3: "db/d",
+                           4: "app/x", 5: "app/y"},
+                 id_subsystem={0: "db", 1: "db", 2: "db", 3: "db", 4: "app", 5: "app"})
+    e.meta = {"subsystem_commit_size": {"db": avg_commit_size, "app": 3},
+              "commit_size_p50": 5}
+    return e
+
+
+def test_detect_batch_dirs_flags_dense_island_from_big_commits():
+    # dominant (6/7) + dense (clique) + island + big commits (20 >= 2*5) -> flagged
+    assert detect_batch_dirs(_db_couplings(), _enc_batch(20)) == ["db"]
+
+
+def test_detect_batch_dirs_skips_cohesive_small_commit_component():
+    # same shape but normal-sized commits (6 < 2*5) -> NOT a batch clique -> kept
+    assert detect_batch_dirs(_db_couplings(), _enc_batch(6)) == []

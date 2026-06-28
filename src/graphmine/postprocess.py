@@ -146,6 +146,53 @@ def suggest_exclusions(couplings: list[Coupling], enc: Encoding, *,
     return out
 
 
+def detect_batch_dirs(couplings: list[Coupling], enc: Encoding, *,
+                      min_share: float = 0.5, min_density: float = 0.5,
+                      min_island: float = 0.8, batch_factor: float = 2.0) -> list[str]:
+    """Subsystems confident enough to *auto*-exclude — a dominant, dense, island-like
+    clique driven by large commits. ALL four signals must hold (deliberately strict,
+    so a genuinely cohesive component is never dropped):
+
+    * dominance  — within-subsystem couplings are >= ``min_share`` of all couplings
+    * density    — within-couplings / possible-pairs >= ``min_density`` (a real clique)
+    * island     — within / (within + cross) >= ``min_island`` (little outward coupling)
+    * batch      — the subsystem's mean commit size >= ``batch_factor`` x the repo median
+                   (the causal tell of batch migrations; needs encoder commit stats)
+    """
+    if not couplings:
+        return []
+    from collections import Counter, defaultdict
+    total = len(couplings)
+    within: Counter = Counter()
+    touch: Counter = Counter()
+    coupled: dict[str, set] = defaultdict(set)   # items that actually participate in couplings
+    for c in couplings:
+        sa, sb = enc.subsystem(c.a), enc.subsystem(c.b)
+        coupled[sa].add(c.a)
+        coupled[sb].add(c.b)
+        if sa == sb:
+            within[sa] += 1
+            touch[sa] += 1
+        else:
+            touch[sa] += 1
+            touch[sb] += 1
+    scs = enc.meta.get("subsystem_commit_size", {})
+    median = enc.meta.get("commit_size_p50") or 0
+    out = []
+    for sub, w in within.items():
+        if sub in ("(root)", "?"):
+            continue
+        k = len(coupled.get(sub, ()))    # clique density over coupling files, not all items
+        possible = k * (k - 1) // 2
+        share = w / total
+        density = w / possible if possible else 0.0
+        island = w / touch[sub] if touch[sub] else 0.0
+        batchy = (scs.get(sub, 0.0) >= batch_factor * median) if median else False
+        if share >= min_share and density >= min_density and island >= min_island and batchy:
+            out.append(sub)
+    return out
+
+
 def _build_cluster(members: set[int], couplings: list[Coupling], enc: Encoding) -> Cluster:
     ps = [c.p_raw for c in couplings if c.a in members and c.b in members]
     subs = sorted({enc.subsystem(m) for m in members})
