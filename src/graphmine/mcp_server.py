@@ -33,15 +33,26 @@ class GraphmineService:
         if not self.repo:
             raise ValueError("cannot build an index without a repo")
         bk = self.build_kwargs
-        if self.encoder == "cochange":
-            enc = git_cochange.encode(
-                self.repo, min_freq=bk.get("min_freq", 3),
-                max_commit_files=bk.get("max_commit_files", 40),
-                subsystem_depth=bk.get("subsystem_depth", "auto"),
-                exclude=tuple(bk.get("exclude", ())))
-        else:
-            enc = graph_coref.encode(self.repo,
-                                     subsystem_depth=bk.get("subsystem_depth", "auto"))
+
+        def _encode(extra_exclude=()):
+            if self.encoder == "cochange":
+                return git_cochange.encode(
+                    self.repo, min_freq=bk.get("min_freq", 3),
+                    max_commit_files=bk.get("max_commit_files", "auto"),
+                    subsystem_depth=bk.get("subsystem_depth", "auto"),
+                    exclude=tuple(bk.get("exclude", ())) + tuple(extra_exclude))
+            return graph_coref.encode(self.repo,
+                                      subsystem_depth=bk.get("subsystem_depth", "auto"))
+
+        enc = _encode()
+        if bk.get("auto_exclude") and self.encoder == "cochange":
+            from . import postprocess as pp
+            first = analyze.build(enc, policy=bk.get("policy", "raw"),
+                                  alpha=bk.get("alpha", 0.05))
+            batch = pp.detect_batch_dirs(first.couplings, enc)
+            if batch:
+                enc = _encode(batch)
+                enc.meta["auto_excluded"] = batch
         an = analyze.build(enc, policy=bk.get("policy", "raw"),
                            alpha=bk.get("alpha", 0.05),
                            git_head=store.git_head(self.repo))
@@ -64,9 +75,9 @@ class GraphmineService:
 
     # --- operations (also the MCP tools) -----------------------------------
     def blast_radius(self, files: list[str], alpha: float | None = None,
-                     depth: int = 1, limit: int | None = 50) -> dict:
+                     depth: int = 1, limit: int | None = 50, rank_by: str = "p") -> dict:
         impacted = query.blast_radius(self.index, files, alpha=alpha,
-                                      depth=depth, limit=limit)
+                                      depth=depth, limit=limit, rank_by=rank_by)
         unknown = [f for f in files if not query.known_file(self.index, f)]
         return {"seeds": [f.replace("\\", "/") for f in files],
                 "impacted": impacted, "unknown_seeds": unknown}
@@ -103,12 +114,13 @@ def build_mcp(service: GraphmineService):
 
     @mcp.tool()
     def blast_radius(files: list[str], alpha: float | None = None,
-                     depth: int = 1, limit: int = 50) -> dict:
+                     depth: int = 1, limit: int = 50, rank_by: str = "p") -> dict:
         """Files that have historically changed together with the given file(s).
 
         Use this to gauge the impact of editing a file ("what else usually moves
         with it?") or, given several files you are about to change, what else the
-        change tends to pull in. Ranked by p (smaller = stronger coupling).
+        change tends to pull in. Each hit carries `p` (significance), `confidence`
+        = P(neighbour changes | seed changes), and `lift`.
 
         Args:
             files: repo-relative path(s) to seed from (union of their radii).
@@ -116,8 +128,10 @@ def build_mcp(service: GraphmineService):
                 threshold.
             depth: hops to expand (1 = direct co-change neighbours).
             limit: max results.
+            rank_by: "p" (significance, default), "confidence", or "lift".
         """
-        return service.blast_radius(files, alpha=alpha, depth=depth, limit=limit)
+        return service.blast_radius(files, alpha=alpha, depth=depth, limit=limit,
+                                    rank_by=rank_by)
 
     @mcp.tool()
     def refresh() -> dict:

@@ -31,12 +31,13 @@ graphmine writes **nothing into the project**: indexes cache in `~/.graphmine/<r
 
 1. **Build** the index (once per repo; rebuild after new commits):
    ```bash
-   graphmine cochange <repo> --significance tarone
+   graphmine cochange <repo> --significance tarone        # add -v for drill-in suggestions
    ```
 2. **Query** a file's blast radius (instant, reads the cache):
    ```bash
    graphmine blast-radius --repo <repo> --file path/to/file.py
    graphmine blast-radius --repo <repo> --changed a.py,b.py --depth 2 --json
+   graphmine blast-radius --repo <repo> --file path/to/file.py --rank-by confidence
    ```
 3. **Refresh** after new commits: re-run step 1 (or the MCP `refresh()` tool).
 
@@ -47,15 +48,18 @@ graphmine writes **nothing into the project**: indexes cache in `~/.graphmine/<r
   `src/`, `tests/`, `docs/` → depth 1 (Flask); everything under one dir
   (`src/console`, `src/database`, …) → depth 2 (a monorepo). It only affects the
   cross-subsystem *ranking* (`[cross]`), not the couplings themselves.
-- **Exclude noisy, batch-committed dirs.** Files committed in large batches (DB
-  schema/migrations, generated code) form a giant clique that drowns real coupling.
-  graphmine **auto-flags** a dominant clique after mining (e.g. "92% of couplings
-  within `src/database`; consider --exclude …") — follow the hint when it appears:
+- **Batch-committed dirs (DB schema/migrations, generated code) drown real coupling.**
+  Three lines of defense, in order: (1) `--max-commit-files` is **auto by default** — a
+  commit-size knee drops mega/migration commits, which usually tames the clique on its
+  own; (2) graphmine still **auto-flags** any dir that dominates the couplings ("92%
+  within `src/database`; consider --exclude …"); (3) opt-in **`--auto-exclude`** drops
+  a confidently-detected batch clique outright and reports what it dropped.
   ```bash
-  graphmine cochange <repo> --exclude src/database          # drop a component
-  graphmine cochange <repo> --max-commit-files 15           # or drop big commits
+  graphmine cochange <repo>                          # auto knee usually handles it
+  graphmine cochange <repo> --exclude src/database   # or drop a dir manually
+  graphmine cochange <repo> --auto-exclude           # or auto-detect & drop a batch clique
   ```
-  (On one real repo, excluding the schema dir cut 209 couplings → 27 meaningful ones.)
+  (On one real repo this distilled 209 couplings → ~25 meaningful ones.)
 - **`--significance tarone`** (recommended): a valid, cheap multiple-testing
   correction (Tarone's effective number of tests) that also tightens the search →
   **faster** mining. Default is raw `p ≤ --alpha`. Tarone matters most once the
@@ -66,6 +70,9 @@ graphmine writes **nothing into the project**: indexes cache in `~/.graphmine/<r
 ## Reading the output
 
 - **p** — raw Fisher p-value; smaller = stronger / more surprising co-change.
+- **confidence / lift** — effect sizes. confidence = P(neighbour changes | seed
+  changes); use `--rank-by confidence` to order by *strength* ("how likely B moves
+  with A") rather than *significance* (p). lift is symmetric (× above chance).
 - **`[cross]`** — the coupling crosses a subsystem boundary (often the interesting,
   cross-cutting links).
 - **clusters** — families of files that move together as a group.

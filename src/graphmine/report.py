@@ -14,6 +14,7 @@ def to_dict(enc: Encoding, couplings: list[Coupling], clusters: list[Cluster],
     This is the single Index schema shared by the CLI and the MCP server.
     """
     lab = enc.id_label
+    n = enc.n_transactions
     meta = {**enc.meta, "n_transactions": enc.n_transactions,
             "n_items": enc.n_items, "significance": significance}
     if git_head:
@@ -29,7 +30,12 @@ def to_dict(enc: Encoding, couplings: list[Coupling], clusters: list[Cluster],
         ],
         "couplings": [
             {"a": lab[c.a], "b": lab[c.b], "p_raw": c.p_raw,
-             "cross_subsystem": c.cross_subsystem}
+             "cross_subsystem": c.cross_subsystem,
+             "freq_a": c.freq_a, "freq_b": c.freq_b, "freq_ab": c.freq_ab,
+             "lift": (round(c.freq_ab * n / (c.freq_a * c.freq_b), 3)
+                      if c.freq_a and c.freq_b and n else None),
+             "leverage": (round(c.freq_ab / n - (c.freq_a / n) * (c.freq_b / n), 6)
+                          if n else None)}
             for c in couplings
         ],
     }

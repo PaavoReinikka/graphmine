@@ -13,8 +13,8 @@ from . import store
 from .mine import MEASURES
 
 
-def _depth_arg(v):
-    """argparse type for --subsystem-depth: the literal 'auto' or an integer."""
+def _auto_int(v):
+    """argparse type for auto-tunable int args: the literal 'auto' or an integer."""
     if v == "auto":
         return "auto"
     try:
@@ -30,10 +30,17 @@ def _emit(enc, args, corpus, name):
     m = an.enc.meta
     if m.get("subsystem_depth_auto"):
         print(f"[graphmine] auto subsystem-depth: {m.get('subsystem_depth')}", file=sys.stderr)
+    if m.get("max_commit_files_auto"):
+        print(f"[graphmine] commit-size cutoff: {m.get('max_commit_files')} "
+              f"(auto; p50={m.get('commit_size_p50')}, p95={m.get('commit_size_p95')})",
+              file=sys.stderr)
+    scs = m.get("subsystem_commit_size", {})
     for s in an.index["meta"].get("suggestions", []):
+        avg = scs.get(s["subsystem"])
+        prov = f" co-changing via commits averaging {avg} files;" if avg else ""
         print(f"[graphmine] note: {s['share']:.0%} of couplings are within "
-              f"'{s['subsystem']}' (batch clique); consider --exclude {s['subsystem']} "
-              f"or --max-commit-files to surface other structure.", file=sys.stderr)
+              f"'{s['subsystem']}' (batch clique).{prov} consider --exclude "
+              f"{s['subsystem']} or --max-commit-files.", file=sys.stderr)
     md = report_mod.to_markdown(enc, an.couplings, an.clusters, significance=an.significance)
     print(md)
 
@@ -49,6 +56,16 @@ def _emit(enc, args, corpus, name):
         jpath = store.save(an.index, corpus, name)
         out_dir = str(store.cache_dir(corpus))
         print(f"\n[graphmine] cached index -> {jpath}  (use -o DIR to write in-project)")
+
+    if getattr(args, "verbose", False):
+        bf = an.index.get("by_file", {})
+        top = sorted(bf, key=lambda f: len(bf[f]["couples_with"]), reverse=True)[:3]
+        if top:
+            target = f"--repo {corpus}" if name == "cochange" else jpath
+            print("\n[graphmine] drill in — most-coupled files (try blast-radius):")
+            for f in top:
+                print(f"  graphmine blast-radius {target} --file {f}"
+                      f"   # {len(bf[f]['couples_with'])} couplings")
 
     graph_path = getattr(args, "graphify_graph", None)
     if graph_path:
@@ -115,20 +132,26 @@ def main(argv=None):
     common.add_argument("--significance", choices=("raw", "tarone"), default="raw",
                         help="raw: p<=alpha (default) | tarone: Fisher-only corrected "
                              "cut p<=alpha/m_eff (also prunes the search -> faster)")
-    common.add_argument("--subsystem-depth", type=_depth_arg, default="auto", metavar="auto|N",
+    common.add_argument("--subsystem-depth", type=_auto_int, default="auto", metavar="auto|N",
                         help="dir depth defining a 'subsystem' for cross-cutting ranking "
                              "(default: auto-detect the component level)")
     common.add_argument("-o", "--out", default=None, metavar="DIR",
                         help="write index+report into DIR in the project; default is a "
                              "global cache (~/.graphmine/<repo>/), leaving the project clean")
+    common.add_argument("-v", "--verbose", action="store_true",
+                        help="also print drill-in suggestions (ready-to-run blast-radius "
+                             "commands for the most-coupled files)")
 
     cc = sub.add_parser("cochange", parents=[common], help="git co-change mining")
     cc.add_argument("repo")
-    cc.add_argument("--max-commit-files", type=int, default=40)
+    cc.add_argument("--max-commit-files", type=_auto_int, default="auto", metavar="auto|N")
     cc.add_argument("--min-freq", type=int, default=3)
     cc.add_argument("--exclude", action="append", metavar="SUBSTR",
                     help="drop files whose path contains SUBSTR (repeatable); added to the "
                          "built-in skips, e.g. --exclude src/database")
+    cc.add_argument("--auto-exclude", action="store_true",
+                    help="detect and drop dominant batch-clique dirs automatically "
+                         "(opt-in; reports what it dropped)")
     cc.add_argument("--include-deleted", action="store_true",
                     help="keep deleted / old-rename files (archaeology); default prunes "
                          "to currently-tracked files with rename-following")
@@ -152,6 +175,9 @@ def main(argv=None):
     br.add_argument("--alpha", type=float, default=None,
                     help="re-threshold at this alpha (tightens only; default: as built)")
     br.add_argument("--depth", type=int, default=1, help="hops to expand (1 = direct)")
+    br.add_argument("--rank-by", choices=("p", "confidence", "lift"), default="p",
+                    help="order by significance (p, default), confidence "
+                         "P(neighbour|seed), or lift")
     br.add_argument("--limit", type=int, default=None, help="cap number of results")
     br.add_argument("--json", action="store_true", dest="as_json",
                     help="machine-readable JSON output")
@@ -165,10 +191,11 @@ def main(argv=None):
                     help="pure in-memory; do not write the warm-start cache")
     mp.add_argument("--significance", choices=("raw", "tarone"), default="raw")
     mp.add_argument("--alpha", type=float, default=0.05)
-    mp.add_argument("--subsystem-depth", type=_depth_arg, default="auto", metavar="auto|N")
+    mp.add_argument("--subsystem-depth", type=_auto_int, default="auto", metavar="auto|N")
     mp.add_argument("--exclude", action="append", metavar="SUBSTR")
+    mp.add_argument("--auto-exclude", action="store_true")
     mp.add_argument("--min-freq", type=int, default=3)
-    mp.add_argument("--max-commit-files", type=int, default=40)
+    mp.add_argument("--max-commit-files", type=_auto_int, default="auto", metavar="auto|N")
 
     args = p.parse_args(argv)
     if getattr(args, "measure", "fisher") != "fisher":
@@ -180,10 +207,21 @@ def main(argv=None):
 
     if args.cmd == "cochange":
         from .encoders import git_cochange
-        enc = git_cochange.encode(args.repo, max_commit_files=args.max_commit_files,
-                                  min_freq=args.min_freq, subsystem_depth=args.subsystem_depth,
-                                  include_deleted=args.include_deleted,
-                                  exclude=tuple(args.exclude or []))
+        from . import postprocess as pp
+        ekw = dict(max_commit_files=args.max_commit_files, min_freq=args.min_freq,
+                   subsystem_depth=args.subsystem_depth, include_deleted=args.include_deleted)
+        excl = list(args.exclude or [])
+        enc = git_cochange.encode(args.repo, exclude=tuple(excl), **ekw)
+        if args.auto_exclude:
+            first = analyze.build(enc, q=args.q, l_max=args.l_max, t_type=args.t_type,
+                                  measure=args.measure, policy=args.significance, alpha=args.alpha)
+            batch = pp.detect_batch_dirs(first.couplings, enc)
+            if batch:
+                excl += batch
+                enc = git_cochange.encode(args.repo, exclude=tuple(excl), **ekw)
+                enc.meta["auto_excluded"] = batch
+                print(f"[graphmine] auto-excluded batch dir(s): {', '.join(batch)}",
+                      file=sys.stderr)
         _emit(enc, args, args.repo, "cochange")
     elif args.cmd == "coref":
         from .encoders import graph_coref
@@ -203,7 +241,7 @@ def main(argv=None):
             print("[graphmine] provide --file PATH or --changed a,b,...", file=sys.stderr)
             return 1
         res = query.blast_radius(idx, seeds, alpha=args.alpha, depth=args.depth,
-                                 limit=args.limit)
+                                 limit=args.limit, rank_by=args.rank_by)
         if args.as_json:
             print(json.dumps({"seeds": [s.replace("\\", "/") for s in seeds],
                               "impacted": res}, indent=2))
@@ -216,7 +254,9 @@ def main(argv=None):
             for r in res:
                 tag = "  [cross]" if r["cross_subsystem"] else ""
                 hop = f"  h{r['hops']}" if args.depth > 1 else ""
-                print(f"  p={r['p_raw']:.1e}{hop}{tag}  {r['file']}")
+                conf = r.get("confidence")
+                cstr = f" conf={conf:.2f}" if conf is not None else ""
+                print(f"  p={r['p_raw']:.1e}{cstr}{hop}{tag}  {r['file']}")
     elif args.cmd == "mcp":
         if not (args.repo or args.index):
             print("[graphmine] provide --repo or --index", file=sys.stderr)
@@ -231,7 +271,8 @@ def main(argv=None):
                          use_cache=not args.no_cache, policy=args.significance,
                          alpha=args.alpha, subsystem_depth=args.subsystem_depth,
                          exclude=tuple(args.exclude or []), min_freq=args.min_freq,
-                         max_commit_files=args.max_commit_files)
+                         max_commit_files=args.max_commit_files,
+                         auto_exclude=args.auto_exclude)
     return 0
 
 

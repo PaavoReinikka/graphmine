@@ -1,7 +1,10 @@
 """Unit tests for postprocessing — no Kingfisher needed (pure logic)."""
 from graphmine.encoders.base import Encoding
 from graphmine.mine import Rule
-from graphmine.postprocess import (by_file_index, clusters, pairwise_couplings,
+import itertools
+
+from graphmine.postprocess import (Coupling, by_file_index, clusters,
+                                   detect_batch_dirs, pairwise_couplings,
                                    significant, suggest_exclusions)
 
 
@@ -68,6 +71,19 @@ def test_by_file_index_adjacency_and_sort():
     assert bf["a/y"]["couples_with"][0]["file"] == "a/x"
 
 
+def test_by_file_index_effect_sizes():
+    # n=20 commits; a in 10, b in 4, co-occur 4
+    enc = Encoding(transactions=[[0]] * 20,
+                   id_label={0: "a/x", 1: "a/y"}, id_subsystem={0: "a", 1: "a"})
+    cp = Coupling(a=0, b=1, p_raw=1e-6, cross_subsystem=False,
+                  freq_a=10, freq_b=4, freq_ab=4)
+    bf = by_file_index([cp], [], enc)
+    ax = bf["a/x"]["couples_with"][0]            # seed a/x: P(a/y | a/x) = 4/10
+    assert ax["confidence"] == 0.4 and ax["lift"] == 2.0
+    ay = bf["a/y"]["couples_with"][0]            # seed a/y: P(a/x | a/y) = 4/4
+    assert ay["confidence"] == 1.0
+
+
 def test_suggest_exclusions_flags_dominant_subsystem():
     enc = _enc()
     rules = [_fisher(0, 1, 1e-6), _fisher(1, 2, 1e-6), _fisher(0, 2, 1e-6),  # 3 within "a"
@@ -82,3 +98,31 @@ def test_suggest_exclusions_none_when_no_dominant():
     rules = [_fisher(0, 3, 1e-6), _fisher(1, 4, 1e-6)]   # both cross a<->b, no within
     sig = significant(pairwise_couplings(rules, enc), alpha=0.05)
     assert suggest_exclusions(sig, enc) == []
+
+
+def _db_couplings():
+    # a dense 4-file "db" clique (6 pairs) + one unrelated "app" pair
+    cps = [Coupling(a=a, b=b, p_raw=1e-6, cross_subsystem=False)
+           for a, b in itertools.combinations([0, 1, 2, 3], 2)]
+    cps.append(Coupling(a=4, b=5, p_raw=1e-6, cross_subsystem=False))
+    return cps
+
+
+def _enc_batch(avg_commit_size):
+    e = Encoding(transactions=[],
+                 id_label={0: "db/a", 1: "db/b", 2: "db/c", 3: "db/d",
+                           4: "app/x", 5: "app/y"},
+                 id_subsystem={0: "db", 1: "db", 2: "db", 3: "db", 4: "app", 5: "app"})
+    e.meta = {"subsystem_commit_size": {"db": avg_commit_size, "app": 3},
+              "commit_size_p50": 5}
+    return e
+
+
+def test_detect_batch_dirs_flags_dense_island_from_big_commits():
+    # dominant (6/7) + dense (clique) + island + big commits (20 >= 2*5) -> flagged
+    assert detect_batch_dirs(_db_couplings(), _enc_batch(20)) == ["db"]
+
+
+def test_detect_batch_dirs_skips_cohesive_small_commit_component():
+    # same shape but normal-sized commits (6 < 2*5) -> NOT a batch clique -> kept
+    assert detect_batch_dirs(_db_couplings(), _enc_batch(6)) == []

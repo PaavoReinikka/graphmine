@@ -9,8 +9,10 @@ def _index(policy="raw", threshold=0.05, m_eff=None, spectrum=None):
         "meta": {"significance": sig},
         "by_file": {
             "a/x.py": {"subsystem": "a", "cluster": 0, "couples_with": [
-                {"file": "a/y.py", "p_raw": 1e-6, "cross_subsystem": False},
-                {"file": "b/z.py", "p_raw": 1e-3, "cross_subsystem": True}]},
+                {"file": "a/y.py", "p_raw": 1e-6, "cross_subsystem": False,
+                 "confidence": 0.4, "lift": 2.0},
+                {"file": "b/z.py", "p_raw": 1e-3, "cross_subsystem": True,
+                 "confidence": 0.9, "lift": 5.0}]},
             "a/y.py": {"subsystem": "a", "cluster": 0, "couples_with": [
                 {"file": "a/x.py", "p_raw": 1e-6, "cross_subsystem": False}]},
             "b/z.py": {"subsystem": "b", "cluster": 1, "couples_with": [
@@ -28,6 +30,14 @@ def test_blast_radius_direct_ranked_by_p():
     assert [r["file"] for r in res] == ["a/y.py", "b/z.py"]   # sorted by p
     assert all(r["hops"] == 1 for r in res)
     assert res[1]["cross_subsystem"] is True
+
+
+def test_blast_radius_rank_by_confidence():
+    idx = _index()
+    by_p = [r["file"] for r in query.blast_radius(idx, ["a/x.py"], rank_by="p")]
+    by_c = [r["file"] for r in query.blast_radius(idx, ["a/x.py"], rank_by="confidence")]
+    assert by_p == ["a/y.py", "b/z.py"]    # p: 1e-6 before 1e-3
+    assert by_c == ["b/z.py", "a/y.py"]    # confidence: 0.9 before 0.4
 
 
 def test_blast_radius_alpha_only_tightens():

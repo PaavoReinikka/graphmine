@@ -34,9 +34,11 @@ encoder (corpus → transactions+labels) → mine (Kingfisher) → postprocess �
 uv sync                                    # installs deps incl. the kingfisher-bnb wheel (no toolchain)
 uv run graphmine cochange /path/to/repo    # caches the index in ~/.graphmine/<repo>/ (project stays clean)
 uv run graphmine cochange /path/to/repo -o out/   # opt in to writing index+report into the project
+uv run graphmine cochange /path/to/repo -v  # also print drill-in blast-radius suggestions
 uv run graphmine coref graph.json          # static co-reference mining
 # significance: --significance raw (default) | tarone   (Fisher-only; also prunes -> faster)
-# filtering: --exclude SUBSTR (repeatable, e.g. --exclude src/database) --min-freq --max-commit-files
+# filtering: --exclude SUBSTR (e.g. src/database) | --auto-exclude (drop batch cliques) | --min-freq
+#            --max-commit-files (auto|N; default auto = knee-detect & drop mega/migration commits)
 # tuning: --alpha --subsystem-depth (auto|N; default auto) --measure {fisher,chi2,mi,leverage; Fisher-only}
 ```
 
@@ -44,9 +46,11 @@ By default graphmine writes **nothing into your project** — a built index goes
 global per-repo cache (`~/.graphmine/<repo>/`, honoring `$XDG_CACHE_HOME`). Pass
 `-o DIR` to write the index + Markdown report into the project instead.
 
-graphmine **auto-detects `--subsystem-depth`** (and prints what it chose; pass an
-integer to override) and, when one directory dominates the co-change (a
-batch-migrated clique like a DB schema), prints a hint to `--exclude` it.
+graphmine **auto-detects `--subsystem-depth`** (prints what it chose; pass an integer
+to override) and **auto-tunes `--max-commit-files`** (a commit-size knee that drops
+mega/migration commits). When one directory still dominates the co-change (a
+batch-migrated clique like a DB schema) it prints a hint to `--exclude` it; opt-in
+`--auto-exclude` drops a confidently-detected clique for you.
 
 ### Blast radius (which files change with this one)
 
@@ -60,8 +64,10 @@ graphmine blast-radius out/cochange.json --file src/foo.py      # or point at an
 ```
 
 `--changed` unions several seeds ("I'm about to touch these"); `--depth N` expands
-transitively; `--alpha` re-thresholds (tighter only); `--json` is for tools/agents.
-With `--repo`, the cached index is built on first use and reused thereafter.
+transitively; `--rank-by p|confidence|lift` orders by significance (default) or
+strength (confidence = P(neighbour changes | seed changes)); `--alpha` re-thresholds
+(tighter only); `--json` is for tools/agents. With `--repo`, the cached index is built
+on first use and reused thereafter.
 
 ### MCP server (for AI agents)
 

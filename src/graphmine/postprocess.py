@@ -26,6 +26,9 @@ class Coupling:
     b: int
     p_raw: float
     cross_subsystem: bool
+    freq_a: int = 0      # support (commits) of item a
+    freq_b: int = 0      # support of item b
+    freq_ab: int = 0     # co-occurrence of a and b
 
 
 @dataclass
@@ -47,16 +50,23 @@ def pairwise_couplings(rules: list[Rule], enc: Encoding) -> list[Coupling]:
     the two directions is kept.
     """
     best: dict[tuple[int, int], float] = {}
+    co: dict[tuple[int, int], int] = {}
+    support: dict[int, int] = {}
     for r in rules:
         if r.is_negative or len(r.antecedent) != 1 or r.p is None:
             continue
         a, b = r.antecedent[0], r.consequent
+        support[a] = r.freq_x          # antecedent support
+        support[b] = r.freq_a          # consequent support
         key = (a, b) if a < b else (b, a)
+        co[key] = r.freq_xa            # same co-occurrence for either direction
         if key not in best or r.p < best[key]:
             best[key] = r.p
     return [
         Coupling(a=a, b=b, p_raw=p,
-                 cross_subsystem=enc.subsystem(a) != enc.subsystem(b))
+                 cross_subsystem=enc.subsystem(a) != enc.subsystem(b),
+                 freq_a=support.get(a, 0), freq_b=support.get(b, 0),
+                 freq_ab=co.get((a, b), 0))
         for (a, b), p in best.items()
     ]
 
@@ -81,6 +91,7 @@ def by_file_index(couplings: list[Coupling], clusters: list[Cluster],
         for m in cl.members:
             item_cluster[m] = ci
 
+    n = enc.n_transactions
     adj: dict[int, dict] = {}
 
     def node(i: int) -> dict:
@@ -89,11 +100,19 @@ def by_file_index(couplings: list[Coupling], clusters: list[Cluster],
                       "cluster": item_cluster.get(i), "couples_with": []}
         return adj[i]
 
+    def entry(other_label, c, supp_seed, supp_other):
+        # effect sizes from the seed's perspective: confidence = P(other | seed)
+        conf = supp_seed and c.freq_ab / supp_seed or 0.0
+        lift = (c.freq_ab * n / (supp_seed * supp_other)
+                if supp_seed and supp_other and n else 0.0)
+        lev = (c.freq_ab / n - (supp_seed / n) * (supp_other / n)) if n else 0.0
+        return {"file": other_label, "p_raw": c.p_raw,
+                "cross_subsystem": c.cross_subsystem, "confidence": round(conf, 4),
+                "lift": round(lift, 3), "leverage": round(lev, 6)}
+
     for c in couplings:
-        node(c.a)["couples_with"].append(
-            {"file": lab[c.b], "p_raw": c.p_raw, "cross_subsystem": c.cross_subsystem})
-        node(c.b)["couples_with"].append(
-            {"file": lab[c.a], "p_raw": c.p_raw, "cross_subsystem": c.cross_subsystem})
+        node(c.a)["couples_with"].append(entry(lab[c.b], c, c.freq_a, c.freq_b))
+        node(c.b)["couples_with"].append(entry(lab[c.a], c, c.freq_b, c.freq_a))
 
     for e in adj.values():
         e["couples_with"].sort(key=lambda d: d["p_raw"])
@@ -124,6 +143,53 @@ def suggest_exclusions(couplings: list[Coupling], enc: Encoding, *,
         if share >= min_share:
             out.append({"subsystem": sub, "within_couplings": cnt,
                         "share": round(share, 3)})
+    return out
+
+
+def detect_batch_dirs(couplings: list[Coupling], enc: Encoding, *,
+                      min_share: float = 0.5, min_density: float = 0.5,
+                      min_island: float = 0.8, batch_factor: float = 2.0) -> list[str]:
+    """Subsystems confident enough to *auto*-exclude — a dominant, dense, island-like
+    clique driven by large commits. ALL four signals must hold (deliberately strict,
+    so a genuinely cohesive component is never dropped):
+
+    * dominance  — within-subsystem couplings are >= ``min_share`` of all couplings
+    * density    — within-couplings / possible-pairs >= ``min_density`` (a real clique)
+    * island     — within / (within + cross) >= ``min_island`` (little outward coupling)
+    * batch      — the subsystem's mean commit size >= ``batch_factor`` x the repo median
+                   (the causal tell of batch migrations; needs encoder commit stats)
+    """
+    if not couplings:
+        return []
+    from collections import Counter, defaultdict
+    total = len(couplings)
+    within: Counter = Counter()
+    touch: Counter = Counter()
+    coupled: dict[str, set] = defaultdict(set)   # items that actually participate in couplings
+    for c in couplings:
+        sa, sb = enc.subsystem(c.a), enc.subsystem(c.b)
+        coupled[sa].add(c.a)
+        coupled[sb].add(c.b)
+        if sa == sb:
+            within[sa] += 1
+            touch[sa] += 1
+        else:
+            touch[sa] += 1
+            touch[sb] += 1
+    scs = enc.meta.get("subsystem_commit_size", {})
+    median = enc.meta.get("commit_size_p50") or 0
+    out = []
+    for sub, w in within.items():
+        if sub in ("(root)", "?"):
+            continue
+        k = len(coupled.get(sub, ()))    # clique density over coupling files, not all items
+        possible = k * (k - 1) // 2
+        share = w / total
+        density = w / possible if possible else 0.0
+        island = w / touch[sub] if touch[sub] else 0.0
+        batchy = (scs.get(sub, 0.0) >= batch_factor * median) if median else False
+        if share >= min_share and density >= min_density and island >= min_island and batchy:
+            out.append(sub)
     return out
 
 
