@@ -25,8 +25,8 @@ encoder (corpus → transactions+labels) → mine (Kingfisher) → postprocess �
 |---|---|---|---|
 | `cochange` | a git commit | files changed together | evolutionary coupling (often static-invisible) |
 | `coref` | a file | cross-file symbols it references | static co-reference associations |
+| `text` | a text unit (chunk / sentence / doc) | entities occurring in it | significant entity/concept co-occurrence (the statistical layer of [graphweave](https://github.com/PaavoReinikka/graphweave)) |
 | *(planned)* `feature` | a node | one-hot node attributes | community/cluster characterization |
-| *(planned)* `text` | a doc | normalized terms/concepts | doc term associations |
 
 ## Use
 
@@ -99,6 +99,32 @@ graphmine cochange /repo --graphify-graph graphify-out/graph.json --out graphify
 
 graphify wraps this as `graphify cochange` when graphmine is on PATH (install via
 `uv tool install ./graphmine`).
+
+### Text co-occurrence (the graphweave statistical layer)
+
+`graphmine text` mines a [graphweave](https://github.com/PaavoReinikka/graphweave)
+`graph.json` for entity pairs that co-occur in the same text unit far more often
+than their marginal frequencies predict. graphweave *generates* the entities and
+relations; graphmine *annotates* them — complementary, not redundant:
+
+```bash
+graphweave extract notes.txt -o out/ --chunk      # graphweave: chunk-aware extraction
+graphmine text out/graph.json -o out/ --augment   # + additive co_occurs_with edges
+```
+
+The transaction unit is picked automatically: **chunks** when the graph carries
+the `chunks` membership graphweave's chunk-aware extraction records, else
+**sentence-units** (reconstructed from the `sent_index` on deterministic edges),
+else **documents** (multi-doc corpora); override with `--unit`. After a
+graphweave `lift`, `--layer concept` mines the abstraction layer instead (a
+concept occurs wherever one of its instances does). `--min-freq` / `--max-freq-frac`
+drop one-off and ubiquitous entities (the stopwords of co-occurrence mining).
+
+For cross-cutting ranking, the "subsystem" is the source document when the corpus
+has several (cross-doc couplings are the surprising ones), otherwise the entity
+type. `--augment` writes a copy of the input graph with additive `co_occurs_with`
+edges — `STATISTICAL` tier, raw Fisher p as the score, provenance
+`graphmine:text_cooccur` — which loads straight back into graphweave/graphify.
 
 ## Companion Skill (for AI agents)
 

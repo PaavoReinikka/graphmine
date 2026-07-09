@@ -68,3 +68,45 @@ def write_augmented(graph_json_path: str, enc: Encoding, couplings: list[Couplin
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(aug, f)
     return aug["meta"]["graphmine"]
+
+
+def augment_cooccurrence(graph: dict, enc: Encoding, couplings: list[Coupling],
+                         *, relation: str = "co_occurs_with") -> dict:
+    """Additive ``co_occurs_with`` edges directly between ENTITY nodes.
+
+    For the text encoder the coupled items *are* graph node ids (kept in
+    ``enc.meta["id_node"]``), so no file-node mapping is needed. Same contract
+    as ``augment_graph``: non-destructive, ``STATISTICAL`` tier, raw Fisher p as
+    the score, provenance so graphweave's ``merge``/report can trace the source.
+    """
+    id_node = enc.meta.get("id_node", {})
+    have = {n["id"] for n in graph.get("nodes", [])}
+    out = {**graph, "nodes": list(graph.get("nodes", [])),
+           "edges": list(graph.get("edges", []))}
+    added = 0
+    unmapped = 0
+    for c in couplings:
+        sa, sb = id_node.get(c.a), id_node.get(c.b)
+        if sa not in have or sb not in have:
+            unmapped += 1
+            continue
+        out["edges"].append({
+            "source": sa, "target": sb, "relation": relation,
+            "confidence": "STATISTICAL", "confidence_score": c.p_raw, "p_raw": c.p_raw,
+            "provenance": "graphmine:text_cooccur", "weight": 1.0,
+        })
+        added += 1
+    meta = dict(out.get("meta", {}))
+    meta["graphmine"] = {f"{relation}_added": added, "unmapped_couplings": unmapped,
+                         "of_total": len(couplings)}
+    out["meta"] = meta
+    return out
+
+
+def write_augmented_cooccurrence(graph_json_path: str, enc: Encoding,
+                                 couplings: list[Coupling], out_path: str) -> dict:
+    graph = json.loads(open(graph_json_path, encoding="utf-8").read())
+    aug = augment_cooccurrence(graph, enc, couplings)
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(aug, f)
+    return aug["meta"]["graphmine"]

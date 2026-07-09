@@ -75,6 +75,7 @@ def _emit(enc, args, corpus, name):
         print(f"[graphmine] graphify: added {stats['co_changes_with_added']} "
               f"co_changes_with edges ({stats['unmapped_couplings']} of "
               f"{stats['of_total']} couplings had no matching file node) -> {aug_path}")
+    return an, out_dir
 
 
 def _resolve_index(args):
@@ -162,13 +163,30 @@ def main(argv=None):
     cr = sub.add_parser("coref", parents=[common], help="graph co-reference mining")
     cr.add_argument("graph_json")
 
+    tx = sub.add_parser("text", parents=[common],
+                        help="entity co-occurrence mining over a graphweave graph.json")
+    tx.add_argument("graph_json")
+    tx.add_argument("--unit", default="auto", choices=("auto", "chunk", "sentence", "doc"),
+                    help="transaction unit (default auto: chunks if the graph carries "
+                         "them, else sentence-units, else documents)")
+    tx.add_argument("--layer", default="base", choices=("base", "concept"),
+                    help="mine base entities (default) or the lifted concept layer")
+    tx.add_argument("--min-freq", type=int, default=2,
+                    help="drop entities seen in fewer units (default 2)")
+    tx.add_argument("--max-freq-frac", type=float, default=0.6,
+                    help="drop entities present in more than this fraction of units "
+                         "(ubiquitous ones couple with everything; default 0.6)")
+    tx.add_argument("--augment", action="store_true",
+                    help="also write the input graph.json augmented with additive "
+                         "co_occurs_with edges (STATISTICAL tier, raw p as score)")
+
     br = sub.add_parser("blast-radius",
                         help="files that typically change with a given file (query an index)")
     br.add_argument("index", nargs="?", metavar="INDEX.json",
                     help="path to an index JSON; or use --repo to load the cached one")
     br.add_argument("--repo", help="load the cached index for this repo (build with "
                                    "defaults if absent; warn if stale)")
-    br.add_argument("--encoder", default="cochange", choices=("cochange", "coref"),
+    br.add_argument("--encoder", default="cochange", choices=("cochange", "coref", "text"),
                     help="which cached index to use with --repo (default cochange)")
     br.add_argument("--file", help="seed file (repo-relative path)")
     br.add_argument("--changed", help="comma-separated seed files (union of their radii)")
@@ -227,6 +245,27 @@ def main(argv=None):
         from .encoders import graph_coref
         enc = graph_coref.encode(args.graph_json, subsystem_depth=args.subsystem_depth)
         _emit(enc, args, args.graph_json, "coref")
+    elif args.cmd == "text":
+        from .encoders import text_cooccur
+        try:
+            enc = text_cooccur.encode(args.graph_json, unit=args.unit, layer=args.layer,
+                                      min_freq=args.min_freq,
+                                      max_freq_frac=args.max_freq_frac)
+        except ValueError as e:
+            print(f"[graphmine] {e}", file=sys.stderr)
+            return 1
+        print(f"[graphmine] text: {enc.n_transactions} {enc.meta['unit']}-unit "
+              f"transactions, {enc.n_items} entities "
+              f"(subsystem = {enc.meta['subsystem_kind']})", file=sys.stderr)
+        an, out_dir = _emit(enc, args, args.graph_json, "text")
+        if args.augment:
+            from .adapters import graphify as gfy
+            aug_path = os.path.join(out_dir, "text.graphify.json")
+            stats = gfy.write_augmented_cooccurrence(args.graph_json, enc,
+                                                     an.couplings, aug_path)
+            print(f"[graphmine] graphify: added {stats['co_occurs_with_added']} "
+                  f"co_occurs_with edges ({stats['unmapped_couplings']} of "
+                  f"{stats['of_total']} couplings unmapped) -> {aug_path}")
     elif args.cmd == "blast-radius":
         from . import query
         idx = _resolve_index(args)
