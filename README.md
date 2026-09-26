@@ -97,8 +97,10 @@ untouched:
 graphmine cochange /repo --graphify-graph graphify-out/graph.json --out graphify-out
 ```
 
-graphify wraps this as `graphify cochange` when graphmine is on PATH (install via
-`uv tool install ./graphmine`).
+Point graphify's tools at the augmented copy to use it there, e.g.
+`graphify affected <file> --graph graphify-out/cochange.graphify.json --relation co_changes_with`.
+For co-change blast radius in an assistant, graphmine's own MCP server
+(`graphmine mcp --repo .`) is the dedicated interface.
 
 ### Text co-occurrence (the graphweave statistical layer)
 
