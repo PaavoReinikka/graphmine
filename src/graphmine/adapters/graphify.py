@@ -20,17 +20,44 @@ def _norm(p: str | None) -> str:
     return (p or "").replace("\\", "/").lstrip("./")
 
 
+def edge_key(graph: dict) -> str:
+    """The key holding the edge list: graphify's graph.json (networkx node-link)
+    uses ``links``; graphweave and raw extractions use ``edges``. Appending to the
+    wrong one would silently add edges no graphify loader ever reads."""
+    return "links" if "links" in graph and "edges" not in graph else "edges"
+
+
+def _label_names_file(label: str | None, source_file: str) -> bool:
+    # graphify's own file-node rule (build._is_file_node_label): the label is the
+    # bare basename, or a directory-qualified suffix from its disambiguation pass.
+    if not label:
+        return False
+    sf = source_file.replace("\\", "/")
+    return label == sf.rsplit("/", 1)[-1] or (
+        "/" in label and (sf == label or sf.endswith("/" + label)))
+
+
 def file_node_index(graph: dict) -> dict[str, str]:
     """Map normalized source_file -> graphify *file* node id.
 
-    A file node is the node that represents the file itself: it has a source_file
-    but no source_location (symbols carry a line; the file node does not).
+    A file node is the node that represents the file itself. graphify >= 0.9
+    gives it ``source_location: "L1"`` and labels it with the file name, so the
+    label is the reliable signal; older graphs left the location empty, which is
+    kept as a fallback (label matches win, so a directory anchor or other
+    location-less node sharing the source_file never shadows the file node).
     """
     idx: dict[str, str] = {}
+    fallback: dict[str, str] = {}
     for n in graph.get("nodes", []):
         sf = n.get("source_file")
-        if sf and n.get("source_location") in (None, "", "null"):
+        if not sf:
+            continue
+        if _label_names_file(n.get("label"), sf):
             idx.setdefault(_norm(sf), n["id"])
+        elif n.get("source_location") in (None, "", "null"):
+            fallback.setdefault(_norm(sf), n["id"])
+    for k, v in fallback.items():
+        idx.setdefault(k, v)
     return idx
 
 
@@ -39,8 +66,9 @@ def augment_graph(graph: dict, enc: Encoding, couplings: list[Coupling]) -> dict
     ``["meta"]["graphmine"]``: how many couplings mapped onto file nodes."""
     idx = file_node_index(graph)
     lab = enc.id_label
+    ek = edge_key(graph)
     out = {**graph, "nodes": list(graph.get("nodes", [])),
-           "edges": list(graph.get("edges", []))}
+           ek: list(graph.get(ek, []))}
     added = 0
     unmapped = 0
     for c in couplings:
@@ -48,7 +76,7 @@ def augment_graph(graph: dict, enc: Encoding, couplings: list[Coupling]) -> dict
         if not sa or not sb:
             unmapped += 1
             continue
-        out["edges"].append({
+        out[ek].append({
             "source": sa, "target": sb, "relation": "co_changes_with",
             "confidence": "STATISTICAL", "confidence_score": c.p_raw, "p_raw": c.p_raw,
             "weight": 1.0,
@@ -81,8 +109,9 @@ def augment_cooccurrence(graph: dict, enc: Encoding, couplings: list[Coupling],
     """
     id_node = enc.meta.get("id_node", {})
     have = {n["id"] for n in graph.get("nodes", [])}
+    ek = edge_key(graph)
     out = {**graph, "nodes": list(graph.get("nodes", [])),
-           "edges": list(graph.get("edges", []))}
+           ek: list(graph.get(ek, []))}
     added = 0
     unmapped = 0
     for c in couplings:
@@ -90,7 +119,7 @@ def augment_cooccurrence(graph: dict, enc: Encoding, couplings: list[Coupling],
         if sa not in have or sb not in have:
             unmapped += 1
             continue
-        out["edges"].append({
+        out[ek].append({
             "source": sa, "target": sb, "relation": relation,
             "confidence": "STATISTICAL", "confidence_score": c.p_raw, "p_raw": c.p_raw,
             "provenance": "graphmine:text_cooccur", "weight": 1.0,
