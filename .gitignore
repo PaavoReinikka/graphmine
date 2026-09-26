@@ -7,3 +7,5 @@ out/
 out_*/
 corpora/
 .uv_cache/
+# graphify knowledge-graph output (mined project data; never commit)
+graphify-out/
